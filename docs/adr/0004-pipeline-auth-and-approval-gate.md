@@ -1,0 +1,634 @@
+# ADR 0004: Pipeline authentication, role split, and approval gate
+
+- **Status:** Accepted
+- **Date:** 2026-09-27
+- **Phase:** 0
+- **Amends:** ADR 0003 exception table (adds exception E8)
+
+## Context
+Phase 0 requires a plan on every pull request and an apply after merge behind an approval gate,
+using short-lived credentials instead of stored keys. ADR 0003 puts the OIDC provider, the pipeline
+roles, and the state bucket in the `bootstrap` module, which the pipeline must not be able to change.
+
+Facts this ADR relies on:
+- Platform: GitHub Actions. Repository `Sweettreee/Odyssey-Cloud` is public on the GitHub Free plan,
+  created 2026-09-17 (GitHub REST API `created_at`).
+- "Users with GitHub Free plans can only configure environments for public repositories." [G4]
+- "GitHub Actions usage is free ... for public repositories that use standard GitHub-hosted runners." [G13]
+
+## Options considered
+
+| Option | Pros | Cons | Monthly cost impact |
+|---|---|---|---|
+| A. GitHub Actions | Pipeline lives outside AWS, so it carries over to Stage 2 (self-hosted runners are also free [G13]). Smallest bootstrap (OIDC provider + 2 roles). Most material. | Approval gate depends on the repo staying public on the Free plan. | 0 |
+| B. AWS CodePipeline + CodeBuild | Runs inside AWS; no OIDC needed. | AWS-only (fails Stage 2 continuity). Grows the bootstrap module. PR plan comments need extra wiring. | Small, usage-based |
+| C. Atlantis (self-hosted) | Mature PR workflow. | Always-on server and public webhook endpoint: cost and attack surface. | Server + public IPv4 |
+
+Chosen: A.
+
+## Decision
+
+### Naming and placeholders (filled in Step 4)
+
+| Item | Value |
+|---|---|
+| OIDC provider | `arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com` |
+| Plan role | `arn:aws:iam::<ACCOUNT_ID>:role/bootstrap/pipeline-plan` |
+| Apply role | `arn:aws:iam::<ACCOUNT_ID>:role/bootstrap/pipeline-apply` |
+| Boundary policy | `arn:aws:iam::<ACCOUNT_ID>:policy/bootstrap/pipeline-boundary` |
+| State bucket | `<STATE_BUCKET>` |
+| State keys | `bootstrap/terraform.tfstate` (ADR 0003 C-1), `main/terraform.tfstate` |
+| `<OWNER_ID>`, `<REPO_ID>` | From `gh api repos/Sweettreee/Odyssey-Cloud --jq '.owner.id, .id'` |
+
+Every bootstrap IAM resource lives under the IAM path `/bootstrap/`, so one Deny statement covers all of them.
+
+### OIDC subject format
+Facts:
+- Repositories created after July 15, 2026 use an immutable subject format that includes owner and
+  repository IDs; syntax `repo:OWNER@OWNER-ID/REPO@REPO-ID:ref:refs/heads/BRANCH` [G1]. This repository
+  was created after that date.
+- The subject can be customized per repository with `include_claim_keys`. For the immutable format,
+  "`owner_id` and `repo_id` are always included in the `repo` segment of the `sub` claim, even when you
+  customize claims with `include_claim_keys`" [G1].
+- `"context"` is "the part that follows the repository in the default `sub` format" [G1].
+  `ref` is "The git ref that triggered the workflow run." [G1]. `job_workflow_ref` is documented only
+  "For jobs using a reusable workflow" [G1], so it is **not** used.
+- The customization is set with `PUT /repos/{owner}/{repo}/actions/oidc/customization/sub` and read with
+  `GET` on the same path; fine-grained tokens need the "Actions" repository permission, write to set and
+  read to get [G19].
+- AWS maps only standard OIDC claims to condition keys for GitHub (`amr`, `aud`, `email`, `oaud`, `sub`) [A17].
+  `ref` is not among them, so the branch can only be checked inside `sub`.
+
+Decision: customize the subject with `include_claim_keys: ["repo", "context", "ref"]` (setting S15).
+Trust values:
+- Plan (`StringLike`, because the PR number varies):
+  `repo:Sweettreee@<OWNER_ID>/Odyssey-Cloud@<REPO_ID>:pull_request:ref:refs/pull/*/merge`
+- Apply (`StringEquals`):
+  `repo:Sweettreee@<OWNER_ID>/Odyssey-Cloud@<REPO_ID>:environment:production:ref:refs/heads/main`
+
+Inference: both strings. The docs show no example that combines the immutable ID form with
+`pull_request` or `environment` plus `ref`.
+
+Verification (Step 4): verify the exact `sub` strings from a real token, printing **only the `sub` claim,
+never the whole token** (the repo is public). A wrong guess makes the trust fail closed. Never widen a
+pattern just to "make it work".
+
+Fallback: if the plan subject cannot be matched without a wildcard broader than the PR number, or `ref`
+is not accepted as a claim key, remove S15, go back to the default format for both roles
+(`...:pull_request` and `...:environment:production`), rely on S3 alone for the `main`-only rule, and
+record the fallback in this ADR.
+
+### (a) Pull requests from forks: fail closed
+- Never run plan on PRs from forks; only same-repo PRs run plan.
+- First layer, a **process control**: the plan job **fails** (it is not skipped) when
+  `github.event.pull_request.head.repo.full_name != github.repository`.
+  - Reason: "The job reports 'Success'" when a job is skipped by a conditional [G3], so a skipped plan
+    would satisfy the required status check (S13) without any plan. Failing closed means every PR that
+    can be merged has a plan, which is what Phase 0 asks for ("a plan on every pull request", vision §6).
+    To accept an outside contribution, I push its commits to a branch in this repository.
+  - This check lives in the workflow file, and a pull request can change that file: `pull_request` runs
+    "in the context of the merge commit" [G6]; that the PR's own version of the workflow file is used is
+    an inference. So the first layer is a process control (every mergeable PR has a plan), **not a
+    security barrier** against fork code. The security barriers are the second and third layers.
+- Second layer (security): fork PR tokens get no write permissions: "the permissions are adjusted to
+  change any write permissions to read only" [G7], and OIDC requires `id-token: write` [G1].
+- Third layer (security): fork workflow runs need my approval first (S12).
+  I do not approve workflow runs for fork pull requests. Exception: one designated test PR before E4, to verify the second layer.
+- Never use the `pull_request_target` trigger. "Running untrusted code on the `pull_request_target`
+  trigger may lead to security vulnerabilities" and it "runs in the context of the default branch of
+  the base repository" [G6][G11].
+- Verification:
+  - The second layer is an inference: [G7] says write permissions become read-only but does not mention `id-token`.
+  - In Step 4, **before E4**, test with a fork PR opened from someone else's account. The test only
+    checks whether an OIDC token can be requested; no AWS trust exists at that point.
+  - A second account of my own is not allowed: "One person or legal entity may maintain no more than
+    one free Account ..." [G17].
+- Revisit when: a collaborator is added (same-repo PRs would bypass this rule).
+
+### (b) Plan role
+- Trust: only pull request tokens from this repository (P1).
+- Permissions: AWS managed `ReadOnlyAccess` plus the inline policy P2.
+  - P2 allows only the lock file (`<key>.tflock` needs Get/Put/Delete [T1]). Reading and listing the main
+    state already come from `ReadOnlyAccess` (`s3:Get*`, `s3:List*` [A5]).
+  - P2 denies reading any S3 object except `main/terraform.tfstate` and its `.tflock` (`NotResource`),
+    which also blocks the bootstrap state (ADR 0003: "the pipeline has no permission on the bootstrap module").
+  - P2 denies DynamoDB item reads. The actions were derived from `ReadOnlyAccess` v189, which grants
+    `dynamodb:Get*`, `dynamodb:BatchGet*`, `dynamodb:Query`, `dynamodb:Scan`, and `dynamodb:PartiQLSelect` [A5].
+    Expanded against the DynamoDB service reference [A13], the item-reading actions are `GetItem`,
+    `BatchGetItem`, `Query`, `Scan`, `PartiQLSelect`, and `GetRecords` (stream records can hold the
+    "entire item" as new or old images [A14]). `GetResourcePolicy`, `GetShardIterator`, and
+    `GetAbacStatus` return no item data and stay allowed.
+- Keep locking enabled (no `-lock=false`).
+- Known limits:
+  - The plan role can read SSM parameters, Lambda configuration, and logs (`ssm:Get*`, `lambda:Get*`, `logs:Get*` [A5]); see (e) for where secrets may be stored.
+  - It does **not** include `secretsmanager:GetSecretValue` or `kms:Decrypt` [A5].
+  - The plan role must read main state, so anything in state is readable by PR code. See (e) for how secrets stay out of state.
+  - Inferred risk: plan will fail if Terraform later manages S3 objects (other than state) or DynamoDB
+    items, because refreshing them needs the denied reads.
+  - Inferred risk: the DynamoDB Deny lists actions from `ReadOnlyAccess` v189; a later version could add new item-read actions.
+
+### (c) Apply role
+- Trust: only tokens from the `production` environment for runs on `main` (P3).
+- Permissions: AWS managed `AdministratorAccess`, with **permissions boundary = `pipeline-boundary` (P4)**.
+  All explicit Denies live in P4. "The effective permissions are the intersection of both policy types.
+  An explicit deny in either of these policies overrides the allow." [A2]
+- P4 is also required on every role or user the pipeline creates, so a created identity cannot do
+  anything the pipeline itself cannot do.
+- State bucket Deny scope: bucket configuration, object history and ACLs, the whole `bootstrap/` prefix,
+  and `DeleteObject` on the main state key. Get/Put on `main/terraform.tfstate` and Get/Put/Delete on
+  its `.tflock` stay allowed, because apply needs them [T1].
+- Every Deny marked "added" in the escalation table is kept.
+
+### (d) Approval gate
+- Environment `production`: required reviewer = me; prevent self-review OFF; deployment branches = `main`
+  only; administrator bypass disallowed (S1–S4).
+- Apply role trusts only OIDC tokens from the `production` environment for runs on `main` (P3).
+- `main`-only is enforced twice: by S3 on the GitHub side (deployment branches) and by the subject on the
+  AWS side (`ref:refs/heads/main` in P3). S3 remains a key setting: it stops a non-`main` job from reaching
+  the approval step, and it is the first item checked in Step 5.
+- **Ordering rule (hard rule).** Create `production` and configure and verify S1–S4, **and set and read
+  back S15**, **before** the apply role's trust exists (before E4). Never delete or rename `production` while that trust exists.
+  Reason: "Running a workflow that references an environment that does not exist will create an
+  environment with the referenced name ... the newly created environment will not have any protection
+  rules" [G4], and the environment subject contains no branch [G1]. Without this rule, any same-repo
+  branch could get the apply role without approval.
+- Branch protection on `main` (S5–S8, S13–S14): PR required, 0 required approvals, bypass not allowed,
+  plan job as a required status check, branches up to date.
+  - Admins bypass by default: "By default, the restrictions of a branch protection rule don't apply to
+    people with admin permissions to the repository" [G9]. So "Do not allow bypassing the above settings" is on [G10].
+  - 0 approvals is required for a solo repo: "Pull request authors cannot approve their own pull requests." [G12]
+- Considered and not adopted: a saved-plan apply, a plan job on push to `main` before the gated apply,
+  and a workflow concurrency group. Kept for a solo repository; reconsidered when a collaborator is added. Consequence: when I approve, I have not seen a plan computed at
+  that moment; "Require branches to be up to date before merging" narrows the gap.
+- Known limits:
+  - A solo approval is a deliberate pause, not a second-person review. **Finalized in D5:** whether any
+    AWS-side human factor is added to this path.
+  - The gate depends on the repo being public (Free plan). "If you convert a repository from public to
+    private, any configured protection rules or environment secrets will be ignored" [G4]. The apply
+    role's trust would keep working, so before making the repo private, remove the apply role's trust first.
+
+### (e) Repository, secrets, and account baseline
+- **Supply chain:** every action is pinned to a full-length commit SHA ("the only way to use an action
+  as an immutable release" [G11]), enforced by the repository setting S9 [G8]. `.terraform.lock.hcl` is committed.
+- **Token defaults:** for personal-account repositories, `GITHUB_TOKEN` is read-only for contents and
+  packages by default, and workflows are not allowed to create or approve pull requests by default [G8].
+  Keep both defaults (S10, S11); verify in Step 5.
+- **Secrets:** pin Terraform `>= 1.11` (`required_version`). Secrets reach Terraform only as ephemeral
+  values or write-only arguments; values marked `sensitive` are still stored in state and plan files,
+  while ephemeral values (1.10+) and write-only arguments (1.11+) are omitted [T2]. Reason: the plan
+  role must read main state, so any secret stored in state is reachable by PR code.
+- **Public plan output (layered):** secrets never enter Terraform (above); remaining sensitive values are
+  marked `sensitive`; PR comments show only a plan summary (add/change/destroy counts), never the full
+  plan. The full plan stays in the run log linked from the PR. Structural details remain public while
+  the repo is public; AWS account IDs "are not considered secret, sensitive, or confidential information" [A12].
+- **Where secrets live:** secrets are kept separate and stored only in AWS Secrets Manager;
+  `ReadOnlyAccess` does not include `secretsmanager:GetSecretValue` [A5].
+  - Never in SSM parameters, Lambda environment variables, or logs; the plan role can read those
+    (`ssm:Get*`, `lambda:Get*`, `logs:Get*` [A5]).
+  - Cost: "$0.40 / secret / month" [A15]. Keep the number of secrets small.
+  - Known limit (inference): in the same account the apply role (administrator within the boundary) can still read secrets.
+  - Moving secrets to a separate, restricted AWS account is decided in D5 together with AWS Organizations
+    (reference: [W1], section 0x03-1).
+- **`.gitignore`:** add `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4 (Step 4 checklist item).
+- **GitHub account (checklist, done before Step 4 creates AWS resources):**
+  - 2FA with a passkey or security key; no SMS. GitHub offers TOTP, text message, security keys, and passkeys [G14].
+  - Review and remove unused sessions, personal access tokens, SSH keys, and OAuth app grants.
+  - Fine-grained personal access tokens have an expiry and never get `Deployments: write` (it can approve
+    a pending deployment [G16]) or `Administration: write` (inference: it can change environment and
+    branch protection settings).
+  - The `gh` CLI is not left logged in. "The minimum required scopes for the token are: `repo`, `read:org`,
+    and `gist`." [G18], and the `repo` scope can approve a pending deployment [G16]. Log in only when needed
+    (for example the one-time S15 call) and run `gh auth logout` afterwards, or run the E8 read checks with
+    a short-lived, read-only fine-grained token in `GH_TOKEN` [G18].
+  - Why: with 2FA on, "If you access GitHub using other methods, such as the API or the command line,
+    you'll authenticate using a token, application, or SSH key" [G15]. Inference: a stolen token gives
+    access without a 2FA prompt. The "review pending deployments" REST endpoint accepts classic tokens
+    with the `repo` scope, and "Required reviewers with read access to the repository contents and
+    deployments can use this endpoint" [G16]. So a stolen token with `repo` scope could approve an apply.
+    For fine-grained tokens the endpoint requires the "Deployments" repository permission (write) [G16].
+
+## Exception E8 (amends ADR 0003)
+
+| # | Exception | Kind | Who / how | Read-only check |
+|---|---|---|---|---|
+| E8 | GitHub repository settings S1–S15 | Standing | Me / GitHub web UI; S15 by a one-time REST call (`gh api -X PUT ...`) | `gh api` reads of the environment, branch protection, and Actions settings (endpoints confirmed against the GitHub REST docs in Step 4), including `GET /repos/{owner}/{repo}/actions/oidc/customization/sub`, run in Step 5 |
+
+- Why manual, although the `github` Terraform provider could manage these settings: managing them as
+  code would need a long-lived GitHub token with admin rights on the laptop. Holding a long-lived token
+  is itself a security risk (see (e)), and the settings are few and simple.
+- vision §5.1 allows exceptions recorded in an ADR ("... deployed through code and CI/CD pipelines,
+  except for exceptions recorded in an ADR."), and E8 is such an exception.
+- E8 differs from the CLAUDE.md definition of a bootstrap exception ("any action that cannot be done as
+  code"), because these settings could be code. The owner accepted this on 2026-09-25.
+- Ordering: S1–S4 are done and verified, and S15 is set and read back, before E4 (see (d)).
+- ADR 0003 control rules apply to E8.
+
+## Policies
+
+### P1. Plan role trust policy
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GitHubSameRepoPullRequests",
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:Sweettreee@<OWNER_ID>/Odyssey-Cloud@<REPO_ID>:pull_request:ref:refs/pull/*/merge"
+        }
+      }
+    }
+  ]
+}
+```
+Sources: audience and condition shape [G2]; subject format [G1]. `StringLike` only because the PR number varies; the value is not solely a wildcard [A10].
+
+### P2. Plan role inline policy (attached next to `ReadOnlyAccess`)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "UseMainStateLock",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>/main/terraform.tfstate.tflock"
+    },
+    {
+      "Sid": "DenyObjectReadsExceptMainState",
+      "Effect": "Deny",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "NotResource": [
+        "arn:aws:s3:::<STATE_BUCKET>/main/terraform.tfstate",
+        "arn:aws:s3:::<STATE_BUCKET>/main/terraform.tfstate.tflock"
+      ]
+    },
+    {
+      "Sid": "DenyDynamoDBItemReads",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:PartiQLSelect",
+        "dynamodb:GetRecords"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+Notes:
+- The S3 Deny lists object-data reads only, not `s3:GetObject*`. A wildcard would also match
+  bucket-level reads such as `s3:GetObjectLockConfiguration`, which Terraform may need to refresh a
+  bucket (inference; not verified).
+- Every DynamoDB action name was checked against the service reference [A13].
+
+### P3. Apply role trust policy
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GitHubProductionEnvironmentOnly",
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:Sweettreee@<OWNER_ID>/Odyssey-Cloud@<REPO_ID>:environment:production:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
+```
+
+### P4. Boundary policy `pipeline-boundary` (apply role boundary; required on every role and user the pipeline creates)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowWithinBoundary",
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyBootstrapIamChanges",
+      "Effect": "Deny",
+      "NotAction": ["iam:Get*", "iam:List*"],
+      "Resource": [
+        "arn:aws:iam::<ACCOUNT_ID>:role/bootstrap/*",
+        "arn:aws:iam::<ACCOUNT_ID>:policy/bootstrap/*",
+        "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      ]
+    },
+    {
+      "Sid": "DenyStateBucketConfig",
+      "Effect": "Deny",
+      "NotAction": ["s3:Get*", "s3:List*"],
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>"
+    },
+    {
+      "Sid": "DenyStateObjectHistoryAndAcl",
+      "Effect": "Deny",
+      "NotAction": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>/*"
+    },
+    {
+      "Sid": "DenyBootstrapState",
+      "Effect": "Deny",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>/bootstrap/*"
+    },
+    {
+      "Sid": "DenyMainStateDelete",
+      "Effect": "Deny",
+      "Action": "s3:DeleteObject",
+      "Resource": "arn:aws:s3:::<STATE_BUCKET>/main/terraform.tfstate"
+    },
+    {
+      "Sid": "RequireBoundaryOnIamWrites",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:CreateUser",
+        "iam:AttachUserPolicy",
+        "iam:DetachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:DeleteUserPolicy",
+        "iam:PutUserPermissionsBoundary"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::<ACCOUNT_ID>:policy/bootstrap/pipeline-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "DenyBoundaryRemoval",
+      "Effect": "Deny",
+      "Action": ["iam:DeleteRolePermissionsBoundary", "iam:DeleteUserPermissionsBoundary"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyIamGroupWrites",
+      "Effect": "Deny",
+      "Action": ["iam:CreateGroup", "iam:UpdateGroup", "iam:PutGroupPolicy", "iam:AttachGroupPolicy", "iam:AddUserToGroup"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyLongLivedCredentials",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateAccessKey",
+        "iam:UpdateAccessKey",
+        "iam:CreateLoginProfile",
+        "iam:UpdateLoginProfile",
+        "iam:CreateServiceSpecificCredential",
+        "iam:ResetServiceSpecificCredential",
+        "iam:UpdateServiceSpecificCredential",
+        "iam:UploadSSHPublicKey",
+        "iam:UpdateSSHPublicKey",
+        "iam:UploadSigningCertificate",
+        "iam:UpdateSigningCertificate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyMfaChanges",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateVirtualMFADevice",
+        "iam:EnableMFADevice",
+        "iam:DeactivateMFADevice",
+        "iam:DeleteVirtualMFADevice",
+        "iam:ResyncMFADevice"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyNewIdentityProviders",
+      "Effect": "Deny",
+      "Action": ["iam:CreateOpenIDConnectProvider", "iam:CreateSAMLProvider", "iam:UpdateSAMLProvider"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyAccountLevelChanges",
+      "Effect": "Deny",
+      "Action": [
+        "organizations:*",
+        "account:*",
+        "sso:*",
+        "identitystore:*",
+        "iam:UpdateAccountPasswordPolicy",
+        "iam:DeleteAccountPasswordPolicy",
+        "iam:CreateAccountAlias",
+        "iam:DeleteAccountAlias"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Notes on P4:
+- `RequireBoundaryOnIamWrites` uses `StringNotEquals`. When the key is absent and the condition is
+  negated, "the condition is *true*" [A4], so the Deny applies both to a different boundary and to
+  entities with no boundary (for example the D5 human admin identity).
+- Every action in `RequireBoundaryOnIamWrites` supports the `iam:PermissionsBoundary` condition key [A3].
+  `iam:PassRole` does not [A3]; PassRole on bootstrap roles is covered by `DenyBootstrapIamChanges`.
+- `DenyIamGroupWrites`: permissions boundaries apply only to "IAM entities (users or roles)" [A2], so a
+  group cannot carry the boundary. Without this Deny, the pipeline could grant permissions through a group
+  to an existing user without the boundary (for example the D5 admin, if it is a user). The pipeline does
+  not manage groups now; **this Deny can be changed later if groups become necessary.** Action names
+  checked against [A16].
+- The pattern (create only with a fixed boundary; deny editing or removing the boundary) follows the AWS
+  delegation example [A2]. Every action name in P4 was checked against the IAM service reference [A3].
+
+## Escalation paths considered
+
+"Prevented" means an explicit Deny in P4. Items marked "added" went beyond the original decision bullets; the owner kept all of them on 2026-09-25.
+
+| # | Path | Status | Where |
+|---|---|---|---|
+| EP-1 | Create a role without the boundary | Prevented | `RequireBoundaryOnIamWrites` |
+| EP-2 | Create a role with a different, looser boundary | Prevented | `RequireBoundaryOnIamWrites` |
+| EP-3 | Swap the boundary on an existing role (`PutRolePermissionsBoundary`) | Prevented (added) | `RequireBoundaryOnIamWrites` |
+| EP-4 | Remove a boundary (`Delete*PermissionsBoundary`) | Prevented | `DenyBoundaryRemoval` |
+| EP-5 | Edit the boundary policy (new version, set default, delete) | Prevented | `DenyBootstrapIamChanges` |
+| EP-6 | Attach or inline a policy on a role without the boundary, e.g. the D5 admin identity if it is a role | Prevented (added) | `RequireBoundaryOnIamWrites` |
+| EP-7 | Change the trust policy of a role without the boundary so the pipeline can assume it | Prevented (added) | `RequireBoundaryOnIamWrites` |
+| EP-8 | Modify, delete, or pass (`iam:PassRole`) the plan or apply role | Prevented | `DenyBootstrapIamChanges` |
+| EP-9 | Modify or delete the GitHub OIDC provider | Prevented | `DenyBootstrapIamChanges` |
+| EP-10 | Create an IAM user without the boundary, or edit an existing user's policies | Prevented (added) | `RequireBoundaryOnIamWrites` |
+| EP-11 | Long-lived access key for any user | Prevented | `DenyLongLivedCredentials` |
+| EP-12 | Other long-lived user credentials; re-activating an inactive key | Prevented (added) | `DenyLongLivedCredentials` |
+| EP-13 | Take over the human admin: reset its console password and replace its MFA device | Prevented (added). **Finalized in D5:** the admin identity's type and MFA setup | `DenyLongLivedCredentials`, `DenyMfaChanges` |
+| EP-14 | New identity provider (OIDC or SAML) as a new way in | Prevented (added) | `DenyNewIdentityProviders` |
+| EP-15 | Account-level changes: organizations, account settings, password policy, alias; Identity Center | Prevented (added) | `DenyAccountLevelChanges` |
+| EP-16 | Change state bucket settings or delete the bucket | Prevented | `DenyStateBucketConfig` |
+| EP-17 | Read or overwrite bootstrap state; delete old state versions; change object ACLs | Prevented | `DenyBootstrapState`, `DenyStateObjectHistoryAndAcl` |
+| EP-18 | Delete the main state key | Prevented (added) | `DenyMainStateDelete` |
+| EP-19 | A role the pipeline created uses its own IAM rights to escalate | Prevented: it carries the same boundary | P4 as boundary |
+| EP-20 | Pass the D5 admin identity (if it is a role) to a service such as EC2 or Lambda | **Finalized in D5:** the admin role's trust must not include any service principal | D5 |
+| EP-21 | A bounded role, or a resource policy, that trusts a principal outside the account | Not preventable by P4; detect. See "External trust" | D5, D7 |
+| EP-22 | Turn off or delete CloudTrail, its log bucket, or budget alerts | Handed off with an ordering constraint: CloudTrail, its log bucket, budget alerts, and the Denies that protect them exist **no later than E4**. D7 decides the module and the policy | D6, D7 |
+| EP-23 | Approval-free apply by referencing `production` before it exists | Prevented by the ordering rule | (d) |
+| EP-24 | Take over my GitHub account or a token (PR + merge + approval reaches AWS admin without AWS MFA) | Reduced by the account checklist in (e). Alert on every apply-role assumption (CloudTrail `AssumeRoleWithWebIdentity`) handed to D7, delivery path in D6. **Finalized in D5:** how the AWS human identity relates to this path. Rejected: a second GitHub account as approver, because "One person or legal entity may maintain no more than one free Account (if you choose to control a machine account as well, that's fine, but it can only be used for running a machine)" [G17] | (e), D5, D6, D7 |
+| EP-25 | Grant permissions through an IAM group to an existing user without the boundary | Prevented (added) | `DenyIamGroupWrites` |
+
+### External trust (EP-21)
+- F1: A role trust policy "is a required resource-based policy that is attached to a role in IAM" [A8].
+  AWS states that implicit denies in a boundary do not limit certain resource-based-policy grants [A2],
+  but does not directly state that a boundary does not limit who a trust policy admits. That P4 cannot
+  restrict trust-policy contents is an **inference**.
+- F2: The external access analyzer is regional: it analyzes resource-based policies "in the Region where
+  you enabled IAM Access Analyzer" [A8]. An IAM role is global, so a role finding is generated "in each
+  enabled Region" [A8].
+- F3: It analyzes only its listed resource types (S3 buckets and directory buckets, IAM roles, KMS keys,
+  Lambda functions and layers, SQS queues, Secrets Manager secrets, SNS topics, EBS snapshots, RDS DB and
+  cluster snapshots, ECR repositories, EFS file systems, DynamoDB streams and tables) [A8].
+- F4: It is after-the-fact: "It may take up to 30 minutes after a policy is modified" to analyze [A7],
+  and events reach EventBridge "within about an hour" [A9]. External access analysis is "provided at no
+  additional charge" [A6].
+- F5: A pipeline-created role could trust the existing GitHub OIDC provider with another repository's
+  subject. IAM rejects only a missing `sub` or one that is "solely a wildcard character (* and ?) or null" [A10],
+  and "GitHub Actions from organizations or repositories outside of your control are able to assume roles"
+  when `sub` is not limited [A10]. Whether Access Analyzer flags such a role: can't verify.
+- F6: Same-account grants to a role session ARN bypass only implicit denies in a boundary [A2].
+  P4 uses explicit Denies, so it is unaffected.
+- Principle: the GitHub OIDC provider is trusted only by the two bootstrap roles (`pipeline-plan`,
+  `pipeline-apply`); any other role naming it is an anomaly.
+- Plan: (1) the external access analyzer is decided in D7 (Phase 0); (2) a CloudTrail-based alert on
+  trust-policy and resource-policy changes is decided in D7, and it must detect any role other than these
+  two whose trust policy names the GitHub OIDC provider (`CreateRole`, `UpdateAssumeRolePolicy`); (3) AWS Organizations with RCPs is decided
+  in D5. RCPs "don't affect resources in the management account" [A11]; the account is standalone, so
+  (inference) using RCPs would need a new member account.
+
+## GitHub settings (all under exception E8)
+
+| # | Where | Setting | Value | Source |
+|---|---|---|---|---|
+| S1 | Environment `production` | Required reviewers | Me | [G4] |
+| S2 | Environment `production` | Prevent self-review | Off | [G4] |
+| S3 | Environment `production` | Deployment branches and tags | Selected branches and tags: `main` | [G4] |
+| S4 | Environment `production` | Allow administrators to bypass configured protection rules | Off | [G4] |
+| S5 | Branch protection `main` | Require a pull request before merging | On | [G10] |
+| S6 | Branch protection `main` | Require approvals | Off (0) | [G10][G12] |
+| S7 | Branch protection `main` | Do not allow bypassing the above settings | On | [G9][G10] |
+| S8 | Branch protection `main` | Allow force pushes / Allow deletions | Off (both opt-in) | [G10] |
+| S9 | Actions settings | Require actions to be pinned to a full-length commit SHA | On | [G8] |
+| S10 | Actions settings | Workflow permissions (`GITHUB_TOKEN` default) | Read (keep default; verify in Step 5) | [G8] |
+| S11 | Actions settings | Allow GitHub Actions to create and approve pull requests | Off (keep default; verify in Step 5) | [G8] |
+| S12 | Actions settings | Approval for fork pull request workflows | Require approval for all external contributors | [G8] |
+| S13 | Branch protection `main` | Require status checks to pass before merging | On; plan job is required | [G10] |
+| S14 | Branch protection `main` | Require branches to be up to date before merging | On | [G10] |
+| S15 | Actions OIDC (REST API) | Subject claim customization `include_claim_keys` | `["repo", "context", "ref"]`; set before E4 | [G1][G19] |
+
+Workflow rules (checked in code review, not settings):
+- Plan workflow: trigger `pull_request` only; the job fails for fork PRs (see (a));
+  `permissions: { contents: read, id-token: write, pull-requests: write }` (`pull-requests: write` only to post the plan summary).
+- Apply workflow: trigger `push` to `main`; job `environment: production`; `permissions: { contents: read, id-token: write }`.
+- No `pull_request_target` anywhere. Every action pinned to a full-length commit SHA.
+- AWS authentication uses `aws-actions/configure-aws-credentials`, pinned to a full-length commit SHA;
+  its audience `sts.amazonaws.com` matches P1 and P3 [G2].
+
+## Hand-offs
+
+| To | Item |
+|---|---|
+| D5 | Admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, (d) solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account ((e)) |
+| D6 | Delivery path for the apply-role assumption alert and security alerts |
+| D7 | Protection of CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22, with D6); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24) |
+| Step 4 | `.gitignore` patterns before E4; ordering rule (S1–S4 verified and S15 set and read back before E4); fill `<OWNER_ID>`/`<REPO_ID>` and verify the exact `sub` strings from a real token, printing only the `sub` claim; fork-PR `id-token` test before E4 (one approved test PR); `gh` login hygiene ((e)); confirm `gh api` endpoints for E8 checks |
+
+## 6-Layer check (chosen option)
+
+| Layer | Notes |
+|---|---|
+| Traffic | Only GitHub-hosted runners calling AWS STS; nothing inbound. |
+| Compute | GitHub-hosted runners; no server of my own. |
+| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform >= 1.11, ephemeral / write-only). PR comments carry a plan summary only; structural details are public. |
+| Security | Zero stored keys. Apply requires the `production` environment on `main` plus my approval; `main`-only is enforced by S3 and by the subject (S15), and the ordering rule closes the setup window. Fork PRs fail closed. Bootstrap resources and escalation paths denied by P4. Actions pinned by SHA. External trust is detect-only (D7). GitHub account hardened by checklist. |
+| Cost | 0 KRW: Actions free for public repos [G13]; environments free for public repos [G4]; Access Analyzer external access free [A6] (decided in D7). Secrets Manager: $0.40 per secret per month [A15]; 0 until a secret is stored. |
+| Observability | Actions run logs, environment approval history, CloudTrail role usage; alerts decided in D6/D7. |
+
+## Consequences
+- Easier: no stored secrets; the pipeline carries over to Stage 2; every created role inherits the same guardrails; every mergeable PR has a plan.
+- Harder: one boundary policy must stay correct and changes to it are E7 (manual) applies; outside contributions must be re-pushed to a same-repo branch; fifteen manual GitHub settings (E8) must be checked.
+- The gate is tied to the repo being public on the Free plan.
+- Approval happens without a fresh plan at approval time (not adopted: saved-plan apply, plan on push to `main`).
+- Some paths are detect-only or handed off (EP-20, EP-21, EP-22, EP-24).
+- E8 is an exception recorded in an ADR, as vision §5.1 allows.
+
+## Revisit when
+- A collaborator is added (also reconsider a fresh plan at approval time: saved-plan apply or a plan on push to `main`).
+- A data-storing resource is added (by Phase 2 at the latest).
+- `ReadOnlyAccess` is removed from the plan role or narrowed: re-add `s3:ListBucket` and `s3:GetObject` on the main state key to P2.
+- Terraform starts managing S3 objects or DynamoDB items (the P2 Denies would break plan).
+- A new version of `ReadOnlyAccess` adds DynamoDB item-read actions.
+- A resource that needs its own IAM OIDC provider (for example EKS IRSA) is introduced (`DenyNewIdentityProviders`).
+- Before the repository is made private (remove the apply role's trust first).
+- The repository or GitHub account is renamed: inference, the name part of `sub` changes and the trust
+  fails closed; update the `sub` values in P1 and P3.
+- A needed secret cannot be passed as an ephemeral value or write-only argument.
+- The pipeline needs to manage IAM groups (`DenyIamGroupWrites` in P4).
+- GitHub changes subject customization or the immutable format (update P1/P3).
+- The fork-PR `id-token` test or the Step 4 `sub` check contradicts an inference in (a) or the OIDC subject section.
+
+## Sources
+- [G1] GitHub OIDC reference: https://docs.github.com/en/actions/reference/security/oidc
+- [G2] GitHub, OIDC in AWS: https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws
+- [G3] Troubleshooting required status checks: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/troubleshooting-required-status-checks
+- [G4] Managing environments: https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments
+- [G6] Events that trigger workflows: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
+- [G7] Workflow syntax (`permissions`): https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+- [G8] Actions settings for a repository: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository
+- [G9] About protected branches: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
+- [G10] Managing a branch protection rule: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule
+- [G11] Secure use reference: https://docs.github.com/en/actions/reference/security/secure-use
+- [G12] Approving a PR with required reviews: https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews
+- [G13] GitHub Actions billing: https://docs.github.com/en/billing/concepts/product-billing/github-actions
+- [G14] About two-factor authentication: https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa/about-two-factor-authentication
+- [G15] Accessing GitHub using two-factor authentication: https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa/accessing-github-using-two-factor-authentication
+- [G16] REST API, workflow runs (review pending deployments): https://docs.github.com/en/rest/actions/workflow-runs#review-pending-deployments-for-a-workflow-run ; fine-grained permission data: https://github.com/github/docs/blob/main/src/github-apps/data/fpt-2022-11-28/fine-grained-pat-permissions.json
+- [G17] GitHub Terms of Service, B.3: https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+- [G18] GitHub CLI manual, `gh auth login`: https://cli.github.com/manual/gh_auth_login
+- [G19] REST API, OIDC subject customization: https://docs.github.com/en/rest/actions/oidc ; fine-grained permission data: https://github.com/github/docs/blob/main/src/github-apps/data/fpt-2022-11-28/fine-grained-pat-permissions.json
+- [A2] IAM permissions boundaries: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html
+- [A3] AWS service reference for IAM: https://servicereference.us-east-1.amazonaws.com/v1/iam/iam.json
+- [A4] IAM condition operators: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html
+- [A5] AWS managed policy ReadOnlyAccess (v189): https://docs.aws.amazon.com/aws-managed-policy/latest/reference/ReadOnlyAccess.html
+- [A6] IAM Access Analyzer pricing: https://aws.amazon.com/iam/access-analyzer/pricing/
+- [A7] IAM Access Analyzer findings: https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-concepts.html
+- [A8] IAM Access Analyzer supported resource types: https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-resources.html
+- [A9] IAM Access Analyzer with EventBridge: https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-eventbridge.html
+- [A10] Create a role for OIDC federation (GitHub section): https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html
+- [A11] AWS Organizations resource control policies: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html
+- [A12] AWS account identifiers: https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-identifiers.html
+- [A13] AWS service reference for DynamoDB: https://servicereference.us-east-1.amazonaws.com/v1/dynamodb/dynamodb.json
+- [A14] DynamoDB Streams: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html
+- [A15] AWS Secrets Manager pricing: https://aws.amazon.com/secrets-manager/pricing/
+- [A16] Service Authorization Reference, IAM: https://docs.aws.amazon.com/service-authorization/latest/reference/list_awsidentityandaccessmanagementiam.html
+- [A17] IAM and AWS STS condition context keys, OIDC federation: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif
+- [T1] Terraform S3 backend: https://developer.hashicorp.com/terraform/language/backend/s3
+- [T2] Terraform sensitive data: https://developer.hashicorp.com/terraform/language/manage-sensitive-data
+- [W1] Woowahan tech blog, "사례별로 알아본 안전한 S3 사용 가이드" (2021-11-09), section 0x03-1: https://techblog.woowahan.com/6217/

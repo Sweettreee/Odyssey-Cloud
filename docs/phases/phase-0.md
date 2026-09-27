@@ -4,11 +4,11 @@
 > Update at the end of each learning topic, decision, and implementation step. Keep it short; this is not a transcript.
 
 **Phase status:** In progress
-**Current step:** 3 Design & decisions (not started; Step 2 completed 2026-09-19)
-**Next action:** Confirm the Step 3 design-question list in §3 and answer the two open facts, then start D1.
-**Last updated:** 2026-09-19
+**Current step:** 3 Design & decisions (D1–D4 done; D5 next)
+**Next action:** Present D5 (account identity structure), including the D5 hand-offs from ADR 0004.
+**Last updated:** 2026-09-27
 
-> **Resume point.** Steps 1–2 are done in a previous session. A new session starts here: read §3 "Step 3 plan", get confirmation on the list and the two open facts, then present D1 (problem, 2–3 options, 6-Layer check) and wait for the decision.
+> **Resume point.** Step 3 in progress. D1–D3 decided (ADR 0001–0003). D4 decided (ADR 0004, Accepted). Next: D5, with hand-offs listed in §3.
 
 ## Carry-over from previous phase
 - None (first Phase).
@@ -78,7 +78,7 @@ Status: Final (agreed on 2026-09-17). Added topics 7–8 and one "before moving 
 
 ## 3. Decisions
 
-### Step 3 plan (proposed 2026-09-19, awaiting confirmation)
+### Step 3 plan (confirmed 2026-09-21)
 
 Design questions, in dependency order. Each gets problem/constraints, 2–3 options, a 6-Layer check, my decision, and an ADR. Small ones may share an ADR.
 
@@ -92,15 +92,23 @@ Design questions, in dependency order. Each gets problem/constraints, 2–3 opti
 | D6 | Budget alert design (thresholds, actual vs. forecast, path to Slack) | D1 |
 | D7 | Security logging baseline scope (what, where, how long) | D1 |
 
-Open facts to confirm before D1:
-1. Does a cloud account already exist? Which provider?
-2. Do a GitHub account and a Slack workspace already exist? (needed for D4, D6)
+Facts confirmed 2026-09-21: no cloud account exists yet (created in Step 4); GitHub account and Slack workspace exist.
+
+| # | Decision | ADR |
+|---|---|---|
+| D1 | AWS, Seoul region (`ap-northeast-2`) | 0001 |
+| D2 | Terraform | 0002 |
+| D3 | S3 state with native lock file; separate `bootstrap` root module, state migrated into its own bucket; exceptions E1–E7 | 0003 |
+| D4 | GitHub Actions; OIDC plan role (ReadOnlyAccess + lock + read Denies) and apply role (Admin + boundary P4); `production` environment gate; `main`-only enforced by S3 and the OIDC subject (S15); fork PRs fail closed; GitHub settings as exception E8 | 0004 |
 
 ### ADRs
 
 | ADR | Title | Status |
 |---|---|---|
-| — | — | — |
+| [0001](../adr/0001-stage-1-cloud-provider.md) | Stage 1 cloud provider | Accepted |
+| [0002](../adr/0002-iac-tool.md) | IaC tool | Accepted |
+| [0003](../adr/0003-remote-state-and-bootstrap.md) | Remote state storage and bootstrap | Accepted |
+| [0004](../adr/0004-pipeline-auth-and-approval-gate.md) | Pipeline authentication, role split, and approval gate | Accepted |
 
 ## 4. Implementation log
 
@@ -115,9 +123,27 @@ Open facts to confirm before D1:
 - [ ] Infrastructure changes reach the cloud only through the pipeline.
 - [ ] Test alerts for both budget levels reach Slack.
 
+Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions E1–E6; criterion 2 applies to the `main` module, while `bootstrap` follows E7.
+
 ## 6. Open issues
-- Bootstrap exceptions (account creation, root MFA, and the first credentials) cannot be done as code. Record them in an ADR.
-- Decide in Step 3: how bootstrap exceptions are controlled, and how exit criterion 1 relates to them.
+- ~~Bootstrap exceptions must be recorded in an ADR.~~ Resolved: ADR 0003 (E1–E7).
+- ~~How exceptions are controlled and how exit criterion 1 relates to them.~~ Resolved: ADR 0003 control rules and exit criteria interpretation.
+- D7: decide whether CloudTrail lives in `bootstrap` or `main` (it should be on as early as possible).
+  Constraint (ADR 0004 EP-22): CloudTrail, its log bucket, budget alerts, and the Denies that protect them exist no later than E4.
+- ~~Vision §5.1 "no ClickOps" had no exception clause.~~ Resolved 2026-09-25: owner approved adding "except for exceptions recorded in an ADR" to vision §5.1 (matches CLAUDE.md §11).
+
+### Hand-offs from ADR 0004
+- D5: admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account (ADR 0004 (e)).
+- D6: delivery path for the apply-role assumption alert and security alerts.
+- D7: protect CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24).
+
+### Step 4 checklist (from ADR 0004)
+- GitHub account checklist (2FA passkey/security key, remove unused tokens/keys/grants, check `gh auth status` scopes) before creating AWS resources.
+- `.gitignore`: `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4.
+- E8 ordering: create `production` and verify S1–S4, and set and read back S15, before E4.
+- Fork-PR `id-token` test before E4 (one approved test PR from someone else's account).
+- `gh` login hygiene: log in only when needed and `gh auth logout` afterwards, or use a short-lived read-only token in `GH_TOKEN`.
+- Fill `<OWNER_ID>`/`<REPO_ID>`; verify the exact `sub` strings from a real token, printing only the `sub` claim (never the whole token); confirm `gh api` endpoints for E8 checks.
 
 ## 7. Carry-over to next phase
 - …

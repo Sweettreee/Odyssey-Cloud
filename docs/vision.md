@@ -120,7 +120,7 @@ Each capability starts from a question, not from a service name.
 | **Host OS** | In Stage 1, Linux is the OS for every host I operate, such as container hosts. Stage 2 is undecided. |
 | **Windows** | Windows runs on demand only and never stays on. Auto-shutdown is mandatory. |
 | **Human-in-the-loop** | The AI may query and create resources. Two kinds of action always require explicit confirmation: modify, stop, or delete actions on infrastructure, and delegated tasks with external effects. This must be enforced by permissions, not just by the prompt. |
-| **Infrastructure as Code** | There is no ClickOps. Every resource and every service is deployed through code and CI/CD pipelines. |
+| **Infrastructure as Code** | There is no ClickOps. Every resource and every service is deployed through code and CI/CD pipelines, except for exceptions recorded in an ADR. |
 | **Access** | Only I and explicitly authorized people can reach the platform. |
 
 ### 5.2 Design principles
