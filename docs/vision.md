@@ -4,8 +4,8 @@
 | | |
 |---|---|
 | **Owner** | Noel (김진식) |
-| **Status** | Draft v0.5 (for review) |
-| **Date** | 2026-09-17 |
+| **Status** | Draft v0.6 (for review) |
+| **Date** | 2026-09-28 |
 | **Document type** | Idea & Learning Vision. This is **not** a software design document. |
 
 > This document explains **what** I want to build, **why** I want to build it, and **what kind of engineer** I intend to become by building it. It deliberately leaves implementation choices open. Architecture decisions will be made later, one problem at a time, and each will be recorded as an ADR.
@@ -128,6 +128,11 @@ Each capability starts from a question, not from a service name.
 - **The private cloud is the destination.** The public-cloud stage is interim. Stage 1 choices should not block a later move to my own hardware.
 - **Infrastructure and data collection come first; AI comes in stages.** Deterministic collection, briefings, and alerts come first. The AI is added in layers: read-only first, then actions and delegated tasks under confirmation. Rule-based components are not throwaway work: they become the agent's tools and remain as fallbacks.
 - **Keep it simple.** Pick the simplest design that meets the constraints. Avoid resume-driven development.
+  - **Gate:** I can explain every part of the design, and why it exists, on a blank page (§7.1). A design that fails this is not a candidate.
+  - **Then compare, in order:**
+    1. **Fewest moving parts:** fewer components, services, and connections that I must run.
+    2. **Least ongoing operation:** less patching, upgrading, and manual work after it is built.
+  - Cost is not a simplicity criterion. It is a hard constraint (§5.1).
 - **Keep the platform extensible.** New services should plug in without re-architecting.
 - **Log for security across the whole platform.** Keep access and action logs for everything, not only the AI: sign-ins, file access, resource changes, and agent actions. Logs must be reviewable.
 - **Beautiful UI/UX is a requirement.** It is not an afterthought.
