@@ -63,13 +63,13 @@ Only the items below may be done outside code. Any other manual change is a viol
 |---|---|---|---|---|
 | E1 | Create the AWS account | One-time | Me / web sign-up | `aws sts get-caller-identity` returns the account ID |
 | E2 | Register root MFA | One-time | Root / console | `aws iam get-account-summary` shows `AccountMFAEnabled: 1` |
-| E3 | Create the first admin identity | One-time | Root / console (form decided in D5) | Defined in D5 |
+| E3 | Create the first admin identity | One-time | Root / console (IAM user, ADR 0005) | IAM console, read-only: the admin user has console access, one MFA device, no access keys, and the policies `AdministratorAccess` and `SignInLocalDevelopmentAccess` |
 | E4 | First `bootstrap` apply with local state | One-time | E3 identity / laptop | `terraform plan` in `bootstrap` shows no changes |
 | E5 | Migrate bootstrap state into the bucket (`terraform init -migrate-state`) | One-time | E3 identity / laptop | `aws s3api get-bucket-versioning` shows `Enabled`; no local state file remains |
-| E6 | Root-only account settings, only if required | One-time | Root / console | Need and exact settings confirmed in D5 and D6 |
+| E6 | Root-only tasks, only when required: "Activate IAM Access" to the Billing console (once), and any root-only task that becomes necessary later, such as recovering the admin identity (ADR 0005) | Standing | Root / console | `aws iam get-account-summary` shows `AccountMFAEnabled: 1` and `AccountAccessKeysPresent: 0`; the admin can open the Billing console |
 | E7 | Every change to the `bootstrap` module | Standing | E3 identity / laptop, see below | `terraform plan` in `bootstrap` shows no changes; each apply matches a merged PR (CloudTrail, D7) |
 
-> Amended by ADR 0004 (exception E8).
+> Amended by ADR 0004 (exception E8) and ADR 0005 (exception E9).
 
 **E7 procedure:** change via pull request only, with the local `terraform plan` output
 attached; review and merge; apply only from the merged `main`, with the E3 identity.
