@@ -161,8 +161,8 @@ record the fallback in this ADR.
   and a workflow concurrency group. Kept for a solo repository; reconsidered when a collaborator is added. Consequence: when I approve, I have not seen a plan computed at
   that moment; "Require branches to be up to date before merging" narrows the gap.
 - Known limits:
-  - A solo approval is a deliberate pause, not a second-person review. **Finalized in D5:** whether any
-    AWS-side human factor is added to this path.
+  - A solo approval is a deliberate pause, not a second-person review. Decided in D5 (ADR 0005): no AWS-side
+    factor in the normal path; the AWS admin is the emergency stop (exception E9).
   - The gate depends on the repo being public (Free plan). "If you convert a repository from public to
     private, any configured protection rules or environment secrets will be ignored" [G4]. The apply
     role's trust would keep working, so before making the repo private, remove the apply role's trust first.
@@ -173,7 +173,8 @@ record the fallback in this ADR.
 - **Token defaults:** for personal-account repositories, `GITHUB_TOKEN` is read-only for contents and
   packages by default, and workflows are not allowed to create or approve pull requests by default [G8].
   Keep both defaults (S10, S11); verify in Step 5.
-- **Secrets:** pin Terraform `>= 1.11` (`required_version`). Secrets reach Terraform only as ephemeral
+- **Secrets:** pin Terraform `>= 1.15.0` (`required_version`): write-only arguments need 1.11+ [T2], and the
+  S3 backend accepts `aws login` credentials from 1.15.0 [T3] (ADR 0005). Secrets reach Terraform only as ephemeral
   values or write-only arguments; values marked `sensitive` are still stored in state and plan files,
   while ephemeral values (1.10+) and write-only arguments (1.11+) are omitted [T2]. Reason: the plan
   role must read main state, so any secret stored in state is reachable by PR code.
@@ -187,8 +188,8 @@ record the fallback in this ADR.
     (`ssm:Get*`, `lambda:Get*`, `logs:Get*` [A5]).
   - Cost: "$0.40 / secret / month" [A15]. Keep the number of secrets small.
   - Known limit (inference): in the same account the apply role (administrator within the boundary) can still read secrets.
-  - Moving secrets to a separate, restricted AWS account is decided in D5 together with AWS Organizations
-    (reference: [W1], section 0x03-1).
+  - A separate, restricted AWS account for secrets is created at the Paid-plan transition, together with
+    AWS Organizations (ADR 0005; reference: [W1], section 0x03-1).
 - **`.gitignore`:** add `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4 (Step 4 checklist item).
 - **GitHub account (checklist, done before Step 4 creates AWS resources):**
   - 2FA with a passkey or security key; no SMS. GitHub offers TOTP, text message, security keys, and passkeys [G14].
@@ -402,6 +403,7 @@ Notes:
         "iam:UpdateAccessKey",
         "iam:CreateLoginProfile",
         "iam:UpdateLoginProfile",
+        "iam:DeleteLoginProfile",
         "iam:CreateServiceSpecificCredential",
         "iam:ResetServiceSpecificCredential",
         "iam:UpdateServiceSpecificCredential",
@@ -481,19 +483,20 @@ Notes on P4:
 | EP-10 | Create an IAM user without the boundary, or edit an existing user's policies | Prevented (added) | `RequireBoundaryOnIamWrites` |
 | EP-11 | Long-lived access key for any user | Prevented | `DenyLongLivedCredentials` |
 | EP-12 | Other long-lived user credentials; re-activating an inactive key | Prevented (added) | `DenyLongLivedCredentials` |
-| EP-13 | Take over the human admin: reset its console password and replace its MFA device | Prevented (added). **Finalized in D5:** the admin identity's type and MFA setup | `DenyLongLivedCredentials`, `DenyMfaChanges` |
+| EP-13 | Take over the human admin: reset its console password and replace its MFA device | Prevented (added). The admin is an IAM user with one synced passkey (ADR 0005) | `DenyLongLivedCredentials`, `DenyMfaChanges` |
 | EP-14 | New identity provider (OIDC or SAML) as a new way in | Prevented (added) | `DenyNewIdentityProviders` |
 | EP-15 | Account-level changes: organizations, account settings, password policy, alias; Identity Center | Prevented (added) | `DenyAccountLevelChanges` |
 | EP-16 | Change state bucket settings or delete the bucket | Prevented | `DenyStateBucketConfig` |
 | EP-17 | Read or overwrite bootstrap state; delete old state versions; change object ACLs | Prevented | `DenyBootstrapState`, `DenyStateObjectHistoryAndAcl` |
 | EP-18 | Delete the main state key | Prevented (added) | `DenyMainStateDelete` |
 | EP-19 | A role the pipeline created uses its own IAM rights to escalate | Prevented: it carries the same boundary | P4 as boundary |
-| EP-20 | Pass the D5 admin identity (if it is a role) to a service such as EC2 or Lambda | **Finalized in D5:** the admin role's trust must not include any service principal | D5 |
-| EP-21 | A bounded role, or a resource policy, that trusts a principal outside the account | Not preventable by P4; detect. See "External trust" | D5, D7 |
+| EP-20 | Pass the D5 admin identity (if it is a role) to a service such as EC2 or Lambda | Not applicable while the admin is an IAM user; recheck at the transition (ADR 0005) | ADR 0005 |
+| EP-21 | A bounded role, or a resource policy, that trusts a principal outside the account | Not preventable by P4; detect. See "External trust" | D7; RCPs after the transition (ADR 0005) |
 | EP-22 | Turn off or delete CloudTrail, its log bucket, or budget alerts | Handed off with an ordering constraint: CloudTrail, its log bucket, budget alerts, and the Denies that protect them exist **no later than E4**. D7 decides the module and the policy | D6, D7 |
 | EP-23 | Approval-free apply by referencing `production` before it exists | Prevented by the ordering rule | (d) |
-| EP-24 | Take over my GitHub account or a token (PR + merge + approval reaches AWS admin without AWS MFA) | Reduced by the account checklist in (e). Alert on every apply-role assumption (CloudTrail `AssumeRoleWithWebIdentity`) handed to D7, delivery path in D6. **Finalized in D5:** how the AWS human identity relates to this path. Rejected: a second GitHub account as approver, because "One person or legal entity may maintain no more than one free Account (if you choose to control a machine account as well, that's fine, but it can only be used for running a machine)" [G17] | (e), D5, D6, D7 |
+| EP-24 | Take over my GitHub account or a token (PR + merge + approval reaches AWS admin without AWS MFA) | Reduced by the account checklist in (e). Alert on every apply-role assumption (CloudTrail `AssumeRoleWithWebIdentity`) handed to D7, delivery path in D6. Decided in D5 (ADR 0005): the AWS admin is the emergency stop (exception E9). Rejected: a second GitHub account as approver, because "One person or legal entity may maintain no more than one free Account (if you choose to control a machine account as well, that's fine, but it can only be used for running a machine)" [G17] | (e), ADR 0005 (E9), D6, D7 |
 | EP-25 | Grant permissions through an IAM group to an existing user without the boundary | Prevented (added) | `DenyIamGroupWrites` |
+| EP-26 | Lock out the human admin by deleting its console password (`DeleteLoginProfile`) | Prevented (added in D5, ADR 0005). Known limit: renaming the admin (`UpdateUser`) is still a lockout path, not a takeover path | `DenyLongLivedCredentials` |
 
 ### External trust (EP-21)
 - F1: A role trust policy "is a required resource-based policy that is attached to a role in IAM" [A8].
@@ -519,9 +522,9 @@ Notes on P4:
   `pipeline-apply`); any other role naming it is an anomaly.
 - Plan: (1) the external access analyzer is decided in D7 (Phase 0); (2) a CloudTrail-based alert on
   trust-policy and resource-policy changes is decided in D7, and it must detect any role other than these
-  two whose trust policy names the GitHub OIDC provider (`CreateRole`, `UpdateAssumeRolePolicy`); (3) AWS Organizations with RCPs is decided
-  in D5. RCPs "don't affect resources in the management account" [A11]; the account is standalone, so
-  (inference) using RCPs would need a new member account.
+  two whose trust policy names the GitHub OIDC provider (`CreateRole`, `UpdateAssumeRolePolicy`); (3) Decided in D5 (ADR 0005):
+  AWS Organizations and RCPs come at the Paid-plan transition, when this account becomes a member account;
+  RCPs "don't affect resources in the management account" [A11].
 
 ## GitHub settings (all under exception E8)
 
@@ -555,7 +558,7 @@ Workflow rules (checked in code review, not settings):
 
 | To | Item |
 |---|---|
-| D5 | Admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, (d) solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account ((e)) |
+| D5 | Done (ADR 0005): admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, (d) solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account ((e)) |
 | D6 | Delivery path for the apply-role assumption alert and security alerts |
 | D7 | Protection of CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22, with D6); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24) |
 | Step 4 | `.gitignore` patterns before E4; ordering rule (S1–S4 verified and S15 set and read back before E4); fill `<OWNER_ID>`/`<REPO_ID>` and verify the exact `sub` strings from a real token, printing only the `sub` claim; fork-PR `id-token` test before E4 (one approved test PR); `gh` login hygiene ((e)); confirm `gh api` endpoints for E8 checks |
@@ -566,7 +569,7 @@ Workflow rules (checked in code review, not settings):
 |---|---|
 | Traffic | Only GitHub-hosted runners calling AWS STS; nothing inbound. |
 | Compute | GitHub-hosted runners; no server of my own. |
-| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform >= 1.11, ephemeral / write-only). PR comments carry a plan summary only; structural details are public. |
+| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform >= 1.15.0; ephemeral / write-only). PR comments carry a plan summary only; structural details are public. |
 | Security | Zero stored keys. Apply requires the `production` environment on `main` plus my approval; `main`-only is enforced by S3 and by the subject (S15), and the ordering rule closes the setup window. Fork PRs fail closed. Bootstrap resources and escalation paths denied by P4. Actions pinned by SHA. External trust is detect-only (D7). GitHub account hardened by checklist. |
 | Cost | 0 KRW: Actions free for public repos [G13]; environments free for public repos [G4]; Access Analyzer external access free [A6] (decided in D7). Secrets Manager: $0.40 per secret per month [A15]; 0 until a secret is stored. |
 | Observability | Actions run logs, environment approval history, CloudTrail role usage; alerts decided in D6/D7. |
@@ -631,4 +634,5 @@ Workflow rules (checked in code review, not settings):
 - [A17] IAM and AWS STS condition context keys, OIDC federation: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif
 - [T1] Terraform S3 backend: https://developer.hashicorp.com/terraform/language/backend/s3
 - [T2] Terraform sensitive data: https://developer.hashicorp.com/terraform/language/manage-sensitive-data
+- [T3] Terraform CHANGELOG, 1.15.0 (April 29, 2026), "backend/s3: Support authentication via `aws login`": https://github.com/hashicorp/terraform/blob/v1.15/CHANGELOG.md
 - [W1] Woowahan tech blog, "사례별로 알아본 안전한 S3 사용 가이드" (2021-11-09), section 0x03-1: https://techblog.woowahan.com/6217/
