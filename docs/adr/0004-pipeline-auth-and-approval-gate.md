@@ -559,8 +559,8 @@ Workflow rules (checked in code review, not settings):
 | To | Item |
 |---|---|
 | D5 | Done (ADR 0005): admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, (d) solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account ((e)) |
-| D6 | Delivery path for the apply-role assumption alert and security alerts |
-| D7 | Protection of CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22, with D6); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24) |
+| D6 | Done (ADR 0006): delivery path for the apply-role assumption alert and security alerts |
+| D7 | Protection of CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22, with D6); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24); protection and use of the alert delivery path (ADR 0006 hand-offs) |
 | Step 4 | `.gitignore` patterns before E4; ordering rule (S1–S4 verified and S15 set and read back before E4); fill `<OWNER_ID>`/`<REPO_ID>` and verify the exact `sub` strings from a real token, printing only the `sub` claim; fork-PR `id-token` test before E4 (one approved test PR); `gh` login hygiene ((e)); confirm `gh api` endpoints for E8 checks |
 
 ## 6-Layer check (chosen option)

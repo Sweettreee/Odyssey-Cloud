@@ -164,9 +164,9 @@ These rules always apply, even if I ask casually.
 - Do not use subagents for work that writes files or runs commands. Subagents may not inherit this file or the permission rules.
 
 **Budget**
-- Target: 30,000 KRW/month. Ceiling: 40,000 KRW/month. Both are totals that include infrastructure and AI API costs.
+- Separate monthly budgets in USD. AWS: target under USD 20, ceiling USD 25 (a Route 53 domain counts here). AI API (agent): under USD 10, tracked manually. Usage covered by credits counts as cost. Subscriptions (for example, Claude Code and Slack) are not included.
 - Flag the cost impact of every design option.
-- Never propose exceeding the ceiling without first laying out the options and trade-offs and asking me.
+- Never propose exceeding a ceiling without first laying out the options and trade-offs and asking me.
 
 ## 11. Design principles (summary of `docs/vision.md` §5)
 

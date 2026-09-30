@@ -44,7 +44,7 @@ The phases are ordered by dependency and risk, not by fixed dates.
 
 - **Infrastructure as Code.** Every resource is created through code and deployed through CI/CD. Any exception is recorded in an ADR.
 - **Human-in-the-loop.** The AI can read and create freely. Modifying, destructive, or externally visible actions require confirmation, enforced by permissions rather than prompts.
-- **Fixed budget.** Target 30,000 KRW/month; ceiling 40,000 KRW/month. Both include infrastructure and AI API costs.
+- **Fixed budgets.** AWS: target under USD 20/month, ceiling USD 25/month. AI API: under USD 10/month. Subscriptions are not included.
 - **Security logging.** Access and actions are logged across the whole platform.
 - **Simplicity.** Each design is the simplest one that meets the constraints. No resume-driven technology choices.
 - **Rule-based first, AI second.** Deterministic components are built first. They become the agent's tools and remain as fallbacks.

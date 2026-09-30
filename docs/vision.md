@@ -4,8 +4,8 @@
 | | |
 |---|---|
 | **Owner** | Noel (김진식) |
-| **Status** | Draft v0.6 (for review) |
-| **Date** | 2026-09-28 |
+| **Status** | Draft v0.7 (for review) |
+| **Date** | 2026-09-30 |
 | **Document type** | Idea & Learning Vision. This is **not** a software design document. |
 
 > This document explains **what** I want to build, **why** I want to build it, and **what kind of engineer** I intend to become by building it. It deliberately leaves implementation choices open. Architecture decisions will be made later, one problem at a time, and each will be recorded as an ADR.
@@ -116,7 +116,7 @@ Each capability starts from a question, not from a service name.
 
 | Constraint | Detail |
 |---|---|
-| **Budget** | **Target:** 30,000 KRW per month in total. **Ceiling:** 40,000 KRW per month in total. Both totals include infrastructure, AI API usage, domain, and third-party services. If the ceiling cannot be met, the options and trade-offs are reviewed with me before any decision. It is never exceeded silently. |
+| **Budget** | Separate monthly budgets in USD. **AWS:** target under USD 20, ceiling USD 25; alerts are automated. A domain registered through Route 53 counts toward the AWS budget. **AI API (agent):** under USD 10; tracked manually. Usage covered by credits counts as cost. Subscriptions, such as Claude Code and Slack, are not included. If a ceiling cannot be met, the options and trade-offs are reviewed with me before any decision. It is never exceeded silently. |
 | **Host OS** | In Stage 1, Linux is the OS for every host I operate, such as container hosts. Stage 2 is undecided. |
 | **Windows** | Windows runs on demand only and never stays on. Auto-shutdown is mandatory. |
 | **Human-in-the-loop** | The AI may query and create resources. Two kinds of action always require explicit confirmation: modify, stop, or delete actions on infrastructure, and delegated tasks with external effects. This must be enforced by permissions, not just by the prompt. |
@@ -182,7 +182,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 - **Problem:** Nothing can be built safely if a mistake can quietly cost money or open access.
 - **Scope:**
   - Account hardening: root lockdown, MFA, and no long-lived keys.
-  - Budget alerts at two levels: when the target is reached, and when spending approaches the ceiling.
+  - AWS budget alerts at 50%, 75%, 90%, and 100% of the AWS target, and when the AWS ceiling is reached.
   - An IaC repository with remote state.
   - Infrastructure CI/CD: a plan on every pull request, and apply after merge behind an approval gate.
   - Short-lived credentials for the pipeline instead of stored keys.
@@ -191,7 +191,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 - **Exit criteria:**
   - Every resource exists because of code.
   - Infrastructure changes reach the cloud only through the pipeline.
-  - Test alerts for both budget levels reach Slack.
+  - Test alerts for every AWS budget threshold reach Slack.
 - **Learning Brief (guideline):**
   - *Before starting:*
     - Cloud account structure and the shared responsibility model.
@@ -408,7 +408,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 |---|---|---|
 | System design & trade-offs | Every phase, especially access, Windows on-demand, agent permissions, and the move to a private cloud | ADRs with alternatives and rejected options |
 | Network & security | Private network, zero-trust access, least-privilege identities, agent isolation, and platform-wide security logging | Trust-boundary diagram, external scan results, and log reviews |
-| Cost engineering | The 30,000 KRW target and 40,000 KRW ceiling, on-demand Windows, and LLM usage | Monthly cost reports, split into infrastructure and AI API |
+| Cost engineering | The AWS budget (USD 20 target, USD 25 ceiling), the AI API budget (under USD 10), on-demand Windows, and LLM usage | Monthly cost reports, split into AWS and AI API |
 | Infrastructure as Code & CI/CD | Every phase | Repository history, infrastructure and application pipelines, and a rebuild-from-zero test |
 | Observability & reliability | Phases 3 and 4 | Dashboards, alert history, and measured detection and recovery times |
 | Automation & data pipelines | Collectors, briefings, and delegated tasks | Collector success rates, automated task history, and a log of how failures were handled |
@@ -429,7 +429,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 ### 8.2 Metrics to track from day one
 Without measurements, there are no XYZ bullets later.
 
-- Monthly cost, split into infrastructure and AI API, compared with the target and the ceiling.
+- Monthly cost for AWS and for the AI API, each compared with its own budget.
 - Time to rebuild the environment from zero.
 - Deployment frequency, deployment lead time, and failed deployment rate.
 - Share of resources managed by code (target: 100%).
@@ -442,7 +442,7 @@ Without measurements, there are no XYZ bullets later.
 The numbers will be filled in from real data only.
 
 - *Designed a zero-trust personal cloud with Terraform and CI/CD, reducing full-environment rebuild time from [X] to [Y] while keeping 100% of resources under code.*
-- *Implemented on-demand Windows and Linux compute with enforced auto-stop, keeping total monthly cost (infrastructure and AI API) at [X] KRW against a 30,000 KRW target.*
+- *Implemented on-demand Windows and Linux compute with enforced auto-stop, keeping monthly AWS cost at [X] USD against a USD 20 target.*
 - *Built monitoring and scripted self-healing that detected [X]% of injected failures, with a mean recovery time of [Y] minutes.*
 - *Introduced a Slack-based AI operator and assistant with permission-level human-in-the-loop controls, completing [X] delegated tasks with zero unconfirmed external or destructive actions.*
 
@@ -451,7 +451,7 @@ The numbers will be filled in from real data only.
 ## 9. Success Criteria
 
 - **Every requirement in §4.1 is delivered and works reliably.** The platform provides the features I need.
-- Monthly cost stays within the target where possible and never passes the ceiling without a prior decision.
+- Each monthly budget stays within its target where possible and never passes its ceiling without a prior decision.
 - The whole environment can be rebuilt from code.
 - Security-relevant access and actions are logged and reviewable.
 - For every component, I can explain why it exists, what alternatives I rejected, and what it costs.
@@ -470,7 +470,7 @@ The numbers will be filled in from real data only.
 
 | Risk | Mitigation direction |
 |---|---|
-| Cost overrun | Two-level budget alerts, on-demand defaults, and a monthly cost review. If the ceiling cannot be met, options and trade-offs are reviewed with me before any decision. |
+| Cost overrun | AWS budget alerts (50%, 75%, 90%, and 100% of the target, and the ceiling), manual AI API tracking, on-demand defaults, and a monthly cost review. If a ceiling cannot be met, options and trade-offs are reviewed with me before any decision. |
 | Breach of a personal platform that holds credentials | Least privilege, secret management, a minimal public surface, and platform-wide security logs |
 | AI misuse or prompt injection through collected content | Read-only first, a permission-level confirmation gate, and treating collected data as untrusted |
 | Delegated tasks acting wrongly in external services | Narrowly scoped credentials, confirmation for external effects, and an audit trail |

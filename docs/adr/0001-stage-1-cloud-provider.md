@@ -8,7 +8,7 @@
 No cloud account exists yet, so the provider is an open choice. It fixes the vocabulary,
 tooling, and price list for all of Stage 1. Constraints from `docs/vision.md`:
 
-- Budget: 30,000 KRW/month target, 40,000 KRW/month ceiling, all-in.
+- Budget: 30,000 KRW/month target, 40,000 KRW/month ceiling, all-in. (Changed on 2026-09-29 to separate USD budgets: AWS target under USD 20, ceiling USD 25; vision v0.7.)
 - Windows on demand (Phase 7): hourly Windows instances must be available.
 - IaC + CI/CD with short-lived credentials (Phase 0): OIDC login from GitHub Actions.
 - Security logging baseline: an account-wide API audit trail.
@@ -33,7 +33,7 @@ tooling, and price list for all of Stage 1. Constraints from `docs/vision.md`:
 | Compute | Linux and Windows on demand. ARM (Graviton) instances are cheaper for Linux. |
 | Data | S3 for remote state; locking mechanism decided in the ADR for D3. |
 | Security | IAM with fine-grained policies, MFA, OIDC federation for GitHub Actions, CloudTrail management events at no charge. |
-| Cost | Exact numbers verified against the current price list in D5–D7 and Phase 1. Two-level budget alerts (D6). |
+| Cost | Exact numbers verified against the current price list in D5–D7 and Phase 1. Budget alerts: D6 (ADR 0006). |
 | Observability | CloudWatch + AWS Budgets; Slack delivery via a notification service (D6). |
 
 ## Decision
