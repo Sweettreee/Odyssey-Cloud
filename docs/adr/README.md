@@ -11,3 +11,4 @@ after that it is never rewritten, and a changed decision gets a new ADR that sup
 | 0003 | [Remote state storage and bootstrap](0003-remote-state-and-bootstrap.md) | 0 | Accepted | 2026-09-23 |
 | 0004 | [Pipeline authentication, role split, and approval gate](0004-pipeline-auth-and-approval-gate.md) | 0 | Accepted | 2026-09-25 |
 | 0005 | [Account identity structure](0005-account-identity-structure.md) | 0 | Accepted | 2026-09-28 |
+| 0006 | [AWS budget alerts and alert delivery path](0006-budget-alerts-and-delivery-path.md) | 0 | Accepted | 2026-09-30 |

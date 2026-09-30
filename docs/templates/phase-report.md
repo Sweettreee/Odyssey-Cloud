@@ -24,7 +24,7 @@
 - [x] … (explained without help)
 
 **Metrics**
-- Monthly cost: infrastructure … KRW + AI API … KRW = … KRW (target 30,000 / ceiling 40,000).
+- Monthly cost: AWS … USD (target 20 / ceiling 25); AI API … USD (limit 10).
 - Other metrics from `docs/vision.md` §8.2 that apply to this Phase.
 
 **Open issues**

@@ -69,7 +69,7 @@ Only the items below may be done outside code. Any other manual change is a viol
 | E6 | Root-only tasks, only when required: "Activate IAM Access" to the Billing console (once), and any root-only task that becomes necessary later, such as recovering the admin identity (ADR 0005) | Standing | Root / console | `aws iam get-account-summary` shows `AccountMFAEnabled: 1` and `AccountAccessKeysPresent: 0`; the admin can open the Billing console |
 | E7 | Every change to the `bootstrap` module | Standing | E3 identity / laptop, see below | `terraform plan` in `bootstrap` shows no changes; each apply matches a merged PR (CloudTrail, D7) |
 
-> Amended by ADR 0004 (exception E8) and ADR 0005 (exception E9).
+> Amended by ADR 0004 (exception E8), ADR 0005 (exception E9), and ADR 0006 (exception E10).
 
 **E7 procedure:** change via pull request only, with the local `terraform plan` output
 attached; review and merge; apply only from the merged `main`, with the E3 identity.
@@ -83,7 +83,7 @@ so keep the `bootstrap` module small and rarely changed.
    (by a new ADR that supersedes this one).
 
 **Exit criteria interpretation**
-- Criterion 1: every resource, except those created by E1–E6, exists because of code.
+- Criterion 1: every resource, except those created by E1–E6 and E10, exists because of code.
 - Criterion 2: changes to the `main` module reach the cloud only through the pipeline;
   the `bootstrap` module follows E7.
 

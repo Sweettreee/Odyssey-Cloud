@@ -4,11 +4,11 @@
 > Update at the end of each learning topic, decision, and implementation step. Keep it short; this is not a transcript.
 
 **Phase status:** In progress
-**Current step:** 3 Design & decisions (D1–D5 done; D6 next)
-**Next action:** Present D6 (budget alert design), including the D6 hand-offs from ADR 0004 and ADR 0005.
-**Last updated:** 2026-09-28
+**Current step:** 3 Design & decisions (D1–D6 done; D7 next)
+**Next action:** Present D7 (security logging baseline scope), including the D7 hand-offs from ADR 0004–0006.
+**Last updated:** 2026-09-30
 
-> **Resume point.** Step 3 in progress. D1–D5 decided (ADR 0001–0005, Accepted). Next: D6, with hand-offs listed in §6.
+> **Resume point.** Step 3 in progress. D1–D6 decided (ADR 0001–0006, Accepted). Next: D7, the last Step 3 question, with hand-offs listed in §6.
 
 ## Carry-over from previous phase
 - None (first Phase).
@@ -101,6 +101,7 @@ Facts confirmed 2026-09-21: no cloud account exists yet (created in Step 4); Git
 | D3 | S3 state with native lock file; separate `bootstrap` root module, state migrated into its own bucket; exceptions E1–E7 | 0003 |
 | D4 | GitHub Actions; OIDC plan role (ReadOnlyAccess + lock + read Denies) and apply role (Admin + boundary P4); `production` environment gate; `main`-only enforced by S3 and the OIDC subject (S15); fork PRs fail closed; GitHub settings as exception E8 | 0004 |
 | D5 | One AWS account on the Free plan; root and an IAM user admin, each with one synced passkey; CLI via `aws login`; Organizations, Identity Center, and a sensitive-data account at the Paid-plan transition; E6 made standing; emergency stop E9 | 0005 |
+| D6 | AWS cost budget USD 20/month, credit-covered usage counted as cost; actual-spend alerts at 50/75/90/100% and 125% (= USD 25 ceiling); Budgets → unencrypted SNS topic → Amazon Q Developer → private Slack channel, plus email; in `bootstrap`; Slack authorization as exception E10; Slack stays on the Free plan | 0006 |
 
 ### ADRs
 
@@ -111,6 +112,7 @@ Facts confirmed 2026-09-21: no cloud account exists yet (created in Step 4); Git
 | [0003](../adr/0003-remote-state-and-bootstrap.md) | Remote state storage and bootstrap | Accepted |
 | [0004](../adr/0004-pipeline-auth-and-approval-gate.md) | Pipeline authentication, role split, and approval gate | Accepted |
 | [0005](../adr/0005-account-identity-structure.md) | Account identity structure | Accepted |
+| [0006](../adr/0006-budget-alerts-and-delivery-path.md) | AWS budget alerts and alert delivery path | Accepted |
 
 ## 4. Implementation log
 
@@ -123,9 +125,9 @@ Facts confirmed 2026-09-21: no cloud account exists yet (created in Step 4); Git
 ### Exit criteria
 - [ ] Every resource exists because of code.
 - [ ] Infrastructure changes reach the cloud only through the pipeline.
-- [ ] Test alerts for both budget levels reach Slack.
+- [ ] Test alerts for every AWS budget threshold reach Slack.
 
-Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions E1–E6; criterion 2 applies to the `main` module, while `bootstrap` follows E7.
+Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions E1–E6 and E10; criterion 2 applies to the `main` module, while `bootstrap` follows E7.
 
 ## 6. Open issues
 - ~~Bootstrap exceptions must be recorded in an ADR.~~ Resolved: ADR 0003 (E1–E7).
@@ -134,13 +136,14 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
   Constraint (ADR 0004 EP-22): CloudTrail, its log bucket, budget alerts, and the Denies that protect them exist no later than E4.
 - ~~Vision §5.1 "no ClickOps" had no exception clause.~~ Resolved 2026-09-25: owner approved adding "except for exceptions recorded in an ADR" to vision §5.1 (matches CLAUDE.md §11).
 - ~~Accepted ADRs could not be corrected during their Phase.~~ Resolved 2026-09-28: CLAUDE.md §9 and `docs/adr/README.md` allow in-place edits while the ADR's Phase is in progress.
+- ~~Budget definition.~~ Resolved 2026-09-29: owner approved separate USD budgets (vision v0.7).
 
-### Hand-offs from ADR 0004 and ADR 0005
+### Hand-offs from ADR 0004–0006
 - ~~D5: admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account (ADR 0004 (e)).~~ Done: ADR 0005.
-- D6: delivery path for the apply-role assumption alert (E9 trigger, ADR 0005) and security alerts.
-- D7: protect CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24); the apply-role assumption alert must let me tell my own applies from others (E9); root sign-in alert (ADR 0005).
+- ~~D6: delivery path for the apply-role assumption alert (E9 trigger, ADR 0005) and security alerts.~~ Done: ADR 0006.
+- D7: protect CloudTrail, its log bucket, and budget alerts, in place no later than E4 (EP-22); external access analyzer; CloudTrail alert on trust/resource-policy changes, including any role other than `pipeline-plan`/`pipeline-apply` whose trust names the GitHub OIDC provider (EP-21); alert on every apply-role assumption (EP-24); the apply-role assumption alert must let me tell my own applies from others (E9); root sign-in alert (ADR 0005); from ADR 0006: EventBridge statement in the alert topic policy, Denies protecting the budget, the SNS topic (policy and subscriptions), and the channel configuration, an alert on Budgets API changes, and security alerts as custom notifications through the same topic (needs a trail with logging).
 
-### Step 4 checklist (from ADR 0004 and ADR 0005)
+### Step 4 checklist (from ADR 0004–0006)
 - GitHub account checklist (2FA passkey/security key, remove unused tokens/keys/grants, check `gh auth status` scopes) before creating AWS resources.
 - `.gitignore`: `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4.
 - E8 ordering: create `production` and verify S1–S4, and set and read back S15, before E4.
@@ -152,6 +155,9 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 - Pin Terraform `>= 1.15.0`, AWS provider `>= 6.23.0`, AWS CLI `>= 2.32.0`; no `source_profile` role chaining with `aws login`.
 - Verify that the admin's MFA is asked during `aws login`.
 - P4 includes `iam:DeleteLoginProfile`; make sure a `bootstrap` apply does not remove `emergency-deny-all` (E9).
+- E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role (record it under E10 if so). Verify that budget and custom notifications render with an empty channel role and guardrail.
+- Confirm how the current Budgets API and AWS provider express `IncludeCredit`. Decide whether the Slack workspace and channel IDs go in code or in an ignored `*.tfvars` file (public repo).
+- Exit criterion 3: a temporary USD 0.01 budget (credits counted, same five notifications and topic), added and removed through E7; every alert arrives in Slack and by email.
 
 ## 7. Carry-over to next phase
 - …
