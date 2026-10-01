@@ -549,6 +549,9 @@ Notes on P4:
 Workflow rules (checked in code review, not settings):
 - Plan workflow: trigger `pull_request` only; the job fails for fork PRs (see (a));
   `permissions: { contents: read, id-token: write, pull-requests: write }` (`pull-requests: write` only to post the plan summary).
+- Plan workflow, before AWS authentication: `terraform fmt -check -recursive`, then
+  `terraform init -backend=false` and `terraform validate` in both `bootstrap` and `main`.
+  Any failure fails the plan job (S13). These steps need no AWS credentials.
 - Apply workflow: trigger `push` to `main`; job `environment: production`; `permissions: { contents: read, id-token: write }`.
 - No `pull_request_target` anywhere. Every action pinned to a full-length commit SHA.
 - AWS authentication uses `aws-actions/configure-aws-credentials`, pinned to a full-length commit SHA;

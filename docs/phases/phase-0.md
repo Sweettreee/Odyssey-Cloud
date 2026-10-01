@@ -99,7 +99,7 @@ Facts confirmed 2026-09-21: no cloud account exists yet (created in Step 4); Git
 | D1 | AWS, Seoul region (`ap-northeast-2`) | 0001 |
 | D2 | Terraform | 0002 |
 | D3 | S3 state with native lock file; separate `bootstrap` root module, state migrated into its own bucket; exceptions E1–E7 | 0003 |
-| D4 | GitHub Actions; OIDC plan role (ReadOnlyAccess + lock + read Denies) and apply role (Admin + boundary P4); `production` environment gate; `main`-only enforced by S3 and the OIDC subject (S15); fork PRs fail closed; GitHub settings as exception E8 | 0004 |
+| D4 | GitHub Actions; OIDC plan role (ReadOnlyAccess + lock + read Denies) and apply role (Admin + boundary P4); `production` environment gate; `main`-only enforced by S3 and the OIDC subject (S15); fork PRs fail closed; GitHub settings as exception E8; CI runs `fmt -check` and `validate` (both modules) before AWS authentication | 0004 |
 | D5 | One AWS account on the Free plan; root and an IAM user admin, each with one synced passkey; CLI via `aws login`; Organizations, Identity Center, and a sensitive-data account at the Paid-plan transition; E6 made standing; emergency stop E9 | 0005 |
 | D6 | AWS cost budget USD 20/month, credit-covered usage counted as cost; actual-spend alerts at 50/75/90/100% and 125% (= USD 25 ceiling); Budgets → unencrypted SNS topic → Amazon Q Developer → private Slack channel, plus email; in `bootstrap`; Slack authorization as exception E10; Slack stays on the Free plan | 0006 |
 
