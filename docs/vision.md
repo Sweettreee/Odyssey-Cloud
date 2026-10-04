@@ -4,8 +4,8 @@
 | | |
 |---|---|
 | **Owner** | Noel (김진식) |
-| **Status** | Draft v0.7 (for review) |
-| **Date** | 2026-09-30 |
+| **Status** | Draft v0.8 (for review) |
+| **Date** | 2026-10-04 |
 | **Document type** | Idea & Learning Vision. This is **not** a software design document. |
 
 > This document explains **what** I want to build, **why** I want to build it, and **what kind of engineer** I intend to become by building it. It deliberately leaves implementation choices open. Architecture decisions will be made later, one problem at a time, and each will be recorded as an ADR.
@@ -87,12 +87,12 @@ This table is also the **requirements checklist** used in §9.
 
 | Area | Capability |
 |---|---|
-| **Cloud foundation** | Compute is provisioned on demand through self-service, as with a public cloud provider. **Stage 1:** a public cloud provides the physical hosts and hypervisor, and my platform provisions compute through the provider's API. **Stage 2:** my own private cloud on my own hardware; to be designed later (§6, Stage 2). |
+| **Cloud foundation** | Compute is provisioned on demand through self-service, as with a public cloud provider. **Stage 1:** a public cloud provides the physical hosts and hypervisor, and my platform provisions compute as code through the CI/CD pipeline, after my approval. **Stage 2:** my own private cloud on my own hardware; to be designed later (§6, Stage 2). |
 | **Secure access** | Reachable from anywhere. Access is limited to me and allowlisted people through a VPN or zero-trust layer, with a private network and least-privilege identities. |
 | **Linux compute** | Lightweight containers are provisioned on demand. **Stage 1:** they run on Linux instances. **Stage 2:** to be designed later. |
 | **Windows compute** | Windows is provisioned **on demand only**, in two modes: CLI/script execution and a full GUI desktop over RDP or VNC. **Stage 1:** separate on-demand instances from the provider. **Stage 2:** to be designed later. |
 | **Personal Web UI** | Upload and download files, and browse all collected information: schedules, notices, job and contest listings, and briefing history. The AI agent can read, analyze, and search the files. **Beautiful UI/UX is a requirement.** The specific design is decided when the Web UI is built. |
-| **AI SysAdmin** | It can query and create resources, allocate CPU, RAM, and storage, and monitor the platform. It runs first-level recovery. Any modifying or destructive action requires **Review & Confirm**. |
+| **AI SysAdmin** | It can query resources and monitor the platform, and it runs first-level recovery. Every infrastructure change it proposes, such as creating or starting a resource or allocating CPU, RAM, and storage, is written as code and reaches the cloud only through the pipeline after **Review & Confirm**. |
 | **AI Productivity Assistant** | It **carries out tasks I assign and automates recurring work**. The first capabilities are examples, not the full scope: collecting LMS schedules, notices, class materials, and career listings; morning briefings; deadline alerts; and natural-language search (RAG) over files and collected data. Any task with an external effect (sending, submitting, booking, and similar) requires **Review & Confirm**. |
 | **Interface** | Slack is the interface for all commands, alerts, and briefings. |
 
@@ -116,12 +116,24 @@ Each capability starts from a question, not from a service name.
 
 | Constraint | Detail |
 |---|---|
-| **Budget** | Separate monthly budgets in USD. **AWS:** target under USD 20, ceiling USD 25; alerts are automated. A domain registered through Route 53 counts toward the AWS budget. **AI API (agent):** under USD 10; tracked manually. Usage covered by credits counts as cost. Subscriptions, such as Claude Code and Slack, are not included. If a ceiling cannot be met, the options and trade-offs are reviewed with me before any decision. It is never exceeded silently. |
+| **Budget** | Separate monthly budgets in USD. **AWS:** target under USD 20, ceiling USD 25; alerts are automated. A domain registered through Route 53 counts toward the AWS budget. **AI API (agent):** under USD 10; capped by a monthly spend limit set at the provider, and tracked manually. Usage covered by credits counts as cost. Subscriptions, such as Claude Code and Slack, are not included. If a ceiling cannot be met, the options and trade-offs are reviewed with me before any decision. It is never exceeded silently. |
 | **Host OS** | In Stage 1, Linux is the OS for every host I operate, such as container hosts. Stage 2 is undecided. |
 | **Windows** | Windows runs on demand only and never stays on. Auto-shutdown is mandatory. |
-| **Human-in-the-loop** | The AI may query and create resources. Two kinds of action always require explicit confirmation: modify, stop, or delete actions on infrastructure, and delegated tasks with external effects. This must be enforced by permissions, not just by the prompt. |
+| **Human-in-the-loop** | The AI may query resources and propose infrastructure changes as code. Two kinds of action always require explicit confirmation: every infrastructure change, including create, start, modify, stop, and delete, which reaches the cloud only through the pipeline after my approval; and delegated tasks with external effects. This must be enforced by permissions, not just by the prompt. How automatic actions, such as first-level recovery and Windows auto-stop, fit this rule is decided in the phase that builds them. |
 | **Infrastructure as Code** | There is no ClickOps. Every resource and every service is deployed through code and CI/CD pipelines, except for exceptions recorded in an ADR. |
 | **Access** | Only I and explicitly authorized people can reach the platform. |
+
+**AWS budget allocation.** The AWS target is split by capability, so early phases leave room for later ones. Each phase confirms or adjusts its line at Step 1. The lines add up to the target.
+
+| Capability (Phase) | USD per month |
+|---|---|
+| Foundations & guardrails (0) | 0.5 |
+| Secure access & Linux compute (1) | 12 |
+| Web UI & storage (2) | 2 |
+| Collectors, observability, and agent infrastructure (3–6) | 1.5 |
+| Windows on demand (7) | 3 |
+| Reserve (yearly domain fee, price changes) | 1 |
+| **Total (AWS target)** | **20** |
 
 ### 5.2 Design principles
 
@@ -331,7 +343,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 #### Phase 6: AI Agent, Actions & Delegated Tasks with Human-in-the-Loop
 - **Problem:** I want to operate the infrastructure from Slack and hand off real work to the AI, without risk.
 - **Scope:**
-  - **Infrastructure:** Create and scale actions are allowed. Modify, stop, and delete actions go through a Review & Confirm step on a separate, elevated path.
+  - **Infrastructure:** The agent proposes every change, including create, scale, start, and stop, as code. Each change goes through Review & Confirm and reaches the cloud only through the pipeline, which is the separate, elevated path.
   - **Delegated tasks:** The assistant carries out tasks I assign and automates recurring work. Tasks with external effects go through the same confirmation gate.
   - The agent can also trigger the Phase 4 recovery runbooks.
   - Every action is written to an audit log.
@@ -482,7 +494,7 @@ The numbers will be filled in from real data only.
 
 ## 12. Open Questions (next review)
 
-1. **Authorized personnel:** Who, besides me, should have access? Roughly how many people, and with what level of access?
+1. **Authorized personnel (answered 2026-10-04):** The platform is for me. I may lend selected features to people I authorize, each with their own account. Which features, and for how many people, is decided when those features are designed.
 2. **LMS access:** How will the collectors authenticate to the university LMS? Do the LMS terms of use allow automated access?
-3. **Interim cloud provider and region:** Is AWS in the Seoul region the default for Stage 1, or should the provider itself be an open decision?
+3. **Interim cloud provider and region (answered by ADR 0001):** AWS in the Seoul region (`ap-northeast-2`).
 4. **Timeline:** Which phase should be finished by when? For example, what should be done before the next internship application cycle or the next semester?

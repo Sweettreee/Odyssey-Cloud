@@ -84,6 +84,7 @@ Only the items below may be done outside code. Any other manual change is a viol
 
 **E7 procedure:** change via pull request only, with the local `terraform plan` output
 attached; review and merge; apply only from the merged `main`, with the E3 identity.
+When the change touches a `bootstrap` IAM policy (for example P4), re-run the recorded IAM policy simulator checks and attach the results to the pull request.
 This covers later changes too (for example, widening the apply role's permissions),
 so keep the `bootstrap` module small and rarely changed.
 
