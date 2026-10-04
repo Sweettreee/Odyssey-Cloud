@@ -4,11 +4,11 @@
 > Update at the end of each learning topic, decision, and implementation step. Keep it short; this is not a transcript.
 
 **Phase status:** In progress
-**Current step:** 3 Design & decisions (D1–D7 decided, ADR 0001–0007; Step 3 stays open until the owner closes it)
-**Next action:** Owner reviews the design principles review edits (2026-10-04); Step 3 is not closed yet.
+**Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
+**Next action:** First Step 4 checklist item: I draw the trust boundaries and a one-page control map on a blank page (§6).
 **Last updated:** 2026-10-04
 
-> **Resume point.** Step 3 in progress: D1–D7 decided (ADR 0001–0007, Accepted). Step 3 stays open until the owner closes it.
+> **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 not started; begin with the Step 4 checklist in §6.
 
 ## Carry-over from previous phase
 - None (first Phase).
