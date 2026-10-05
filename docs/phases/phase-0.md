@@ -5,8 +5,8 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** First Step 4 checklist item: I draw the trust boundaries and a one-page control map on a blank page (§6).
-**Last updated:** 2026-10-04
+**Next action:** E8 ordering: create production and verify S1–S4 before E4.
+**Last updated:** 2026-10-05
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 not started; begin with the Step 4 checklist in §6.
 
@@ -204,7 +204,10 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 
 | Date | Step | Result |
 |---|---|---|
-| — | — | — |
+| 2026-10-05 | Trust boundaries | Drawn by the owner (two drafts); gaps checked against ADR 0003–0007; a reference map confirmed the owner's understanding |
+| 2026-10-05 | Control map | Option B: the reference map's crossing table (7 crossings) and P4 Deny groups serve as the control map; no separate owner-drawn table |
+| 2026-10-05 | GitHub account checklist | Owner done: passkey/security-key 2FA, unused sessions/tokens/keys/app grants removed; gh logged out |
+| 2026-10-05 | .gitignore | Terraform patterns added (*.tfstate*, .terraform/, *.tfplan, *.tfvars) |
 
 ## 5. Verification
 
@@ -236,7 +239,7 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 - ~~D7: protect CloudTrail, its log bucket, and budget alerts; external access analyzer; alerts (EP-21, EP-24, E9, root sign-in); ADR 0006 hand-offs.~~ Done: ADR 0007.
 
 ### Step 4 checklist (from ADR 0004–0006)
-- Before the first Step 4 change: I draw the trust boundaries and a one-page control map (threat → EP → control → check) on a blank page (vision §7.1).
+- Before the first Step 4 change: I draw the trust boundaries and a one-page control map (threat → EP → control → check) on a blank page (vision §7.1). Done 2026-10-05 (option B, see §4).
 - GitHub account checklist (2FA passkey/security key, remove unused tokens/keys/grants, check `gh auth status` scopes) before creating AWS resources.
 - `.gitignore`: `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4.
 - E8 ordering: create `production` and verify S1–S4 before E4.

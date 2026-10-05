@@ -219,3 +219,9 @@ __marimo__/
 
 # mac
 .DS_Store
+
+# Terraform (ADR 0004 (e)); .terraform.lock.hcl is committed
+*.tfstate*
+.terraform/
+*.tfplan
+*.tfvars
