@@ -42,10 +42,10 @@ Facts this ADR relies on (all checked 2026-09-28):
 
 | Option | Pros | Cons | Monthly cost impact | Free Tier credit impact |
 |---|---|---|---|---|
-| A. One account, IAM user admin, permanently | Simplest. No new concepts. | Never reaches account isolation, SCP, or RCP. Not the AWS-recommended Identity Center setup. | 0 KRW | Kept |
-| B. One account as management account + Identity Center | AWS-recommended sign-in. | SCP and RCP have no effect on the management account [O2][O3]. Workloads would have to leave the management account to reach C. | 0 KRW | Lost immediately [I3] |
-| C. Management account + workload member account now | Account isolation. SCP and RCP apply to the member. The member's root credentials can be removed [R2]. | Loses the credits now. Most manual steps. | 0 KRW | Lost immediately [F1] |
-| D. A now, C at the Paid-plan transition | Keeps the credits. Simple now. Reaches C later without moving any infrastructure. | A's limits until the trigger. The human sign-in path changes once, later. | 0 KRW | Kept until the trigger; see Consequences |
+| A. One account, IAM user admin, permanently | Simplest. No new concepts. | Never reaches account isolation, SCP, or RCP. Not the AWS-recommended Identity Center setup. | USD 0 | Kept |
+| B. One account as management account + Identity Center | AWS-recommended sign-in. | SCP and RCP have no effect on the management account [O2][O3]. Workloads would have to leave the management account to reach C. | USD 0 | Lost immediately [I3] |
+| C. Management account + workload member account now | Account isolation. SCP and RCP apply to the member. The member's root credentials can be removed [R2]. | Loses the credits now. Most manual steps. | USD 0 | Lost immediately [F1] |
+| D. A now, C at the Paid-plan transition | Keeps the credits. Simple now. Reaches C later without moving any infrastructure. | A's limits until the trigger. The human sign-in path changes once, later. | USD 0 | Kept until the trigger; see Consequences |
 
 Chosen: D.
 
@@ -57,7 +57,7 @@ Chosen: D.
 | Compute | Not applicable. |
 | Data | No new data store. The `aws login` cache (`~/.aws/login/cache`) on the laptop holds temporary credentials, so it is a credential file under CLAUDE.md §10. |
 | Security | Root has MFA, no access keys, and is sealed. The admin is an IAM user with MFA and no access keys. The admin is protected from the pipeline only by P4 (ADR 0004). No SCP or RCP until the trigger. |
-| Cost | 0 KRW per month for every option [P1][O1][I2]. The credits stay until the trigger. At the transition, the sensitive-data account adds USD 1/month per KMS key [K1]; secrets cost USD 0.40/month each wherever they live [S2] (both checked 2026-09-28). |
+| Cost | USD 0 per month for every option [P1][O1][I2]. The credits stay until the trigger. At the transition, the sensitive-data account adds USD 1/month per KMS key [K1]; secrets cost USD 0.40/month each wherever they live [S2] (both checked 2026-09-28). |
 | Observability | Admin and root API calls are recorded by CloudTrail (D7). Alerts on root use are decided in D6/D7. |
 
 ## Decision
@@ -68,7 +68,8 @@ Chosen: D.
 - Admin identity (E3): one IAM user with a console password and MFA. Policies: `AdministratorAccess` and
   `SignInLocalDevelopmentAccess`. No access keys.
 - CLI for E4, E5, and E7: `aws login` (AWS CLI >= 2.32.0). Temporary credentials, up to 12 hours.
-- Terraform `>= 1.15.0` (the S3 backend supports `aws login` only from 1.15.0 [T3]) and AWS provider `>= 6.23.0` [T4].
+- Terraform `~> 1.15.0` (the S3 backend supports `aws login` only from 1.15.0 [T3]) and AWS provider `~> 6.23`
+  (`aws login` works from 6.23.0 [T4]); bounds per ADR 0004 (e) "Versions".
 - Do not use `source_profile` role chaining with `aws login` (#45817 [T6]).
 
 ### Trigger
@@ -84,7 +85,7 @@ Upgrading to the Paid plan: when the credits run out or the 6-month Free plan en
 5. Create the sensitive-data account as a new member account (new member accounts have no root credentials [R2]).
    Move the secrets there, encrypted with a customer managed KMS key; the AWS managed key cannot be used
    across accounts [S1].
-6. Record the transition in a new ADR that supersedes the affected exceptions (ADR 0003 control rule 3).
+6. Record the transition in a new ADR that supersedes the affected exceptions (ADR 0003 control rule 3). That ADR also decides which account-wide P4 Denies move to SCPs (ADR 0004 "Revisit when").
 
 ### Why D
 - A as a permanent state never reaches account isolation, SCP, or RCP.
@@ -96,13 +97,24 @@ Upgrading to the Paid plan: when the credits run out or the 6-month Free plan en
 
 | # | Exception | Kind | Who / how | Read-only check |
 |---|---|---|---|---|
-| E9 | Emergency stop of the pipeline apply role | Standing (emergency only) | Me, IAM user admin with `aws login` + MFA / attach the inline policy `emergency-deny-all` (Deny `*` on `*`) to `pipeline-apply`; remove it after recovery | `aws iam list-role-policies --role-name pipeline-apply` shows no `emergency-deny-all` in normal operation; each use has an incident record in a pull request |
+| E9 | Emergency stop of the pipeline apply role | Standing (emergency only) | Me, IAM user admin with `aws login` + MFA / (1) attach the inline policy `emergency-deny-all` (Deny `*` on `*`) to `pipeline-apply`; (2) create a Deny-all version of `pipeline-boundary` and set it as the default version; restore both after recovery | `aws iam list-role-policies --role-name pipeline-apply` shows no `emergency-deny-all`, and `aws iam get-policy` on `pipeline-boundary` shows the reviewed default version, in normal operation; each use has an incident record in a pull request |
 
 - Trigger: an alert for an apply-role assumption that I did not start. D7 decides what the alert shows,
   so that I can tell my own applies from others.
-- After each use: investigate in CloudTrail, secure the GitHub account, then record the incident and the
-  removal of the policy in a pull request (E7 procedure).
-- Step 4 (inference): make sure a `bootstrap` apply does not silently remove `emergency-deny-all` while it is in place.
+- Why two switches (added 2026-10-04, Phase 0 review): a hijacked apply session can first create its own role with
+  the P4 boundary and `AdministratorAccess` that trusts an outside account (ADR 0004 EP-21); the inline Deny on
+  `pipeline-apply` does not reach it. Every role or user the pipeline creates must carry `pipeline-boundary`
+  (ADR 0004 `RequireBoundaryOnIamWrites`), and a managed policy's default version "is in effect for all of the
+  principal entities … that the managed policy is attached to" [V1]. Inference: a Deny-all default version blocks
+  every identity the pipeline created at once; verify that a boundary behaves this way with the policy simulator in
+  Step 4. A managed policy keeps at most five versions [V1]: if five exist, delete the oldest non-default version
+  first. Trade-off: from Phase 1, legitimate workload roles also stop during the incident.
+- After each use: search CloudTrail in every Region for events from `pipeline-apply` sessions in the incident window;
+  list the roles, trust policies, and resource policies they created or changed, and stop any compute they started.
+  Then secure the GitHub account, and record the incident and the restoration of both switches in a pull request
+  (E7 procedure).
+- Step 4 (inference): make sure a `bootstrap` apply does not silently remove `emergency-deny-all` or restore
+  `pipeline-boundary` while E9 is in place.
 - ADR 0003 control rules apply to E9.
 
 ## Consequences
@@ -140,7 +152,8 @@ Upgrading to the Paid plan: when the credits run out or the 6-month Free plan en
    D6 delivery), I sign in with `aws login` and MFA and attach an inline Deny-all policy to `pipeline-apply`.
    This blocks existing and new sessions; "Revoke active sessions" alone does not block new sessions [R3].
    The pipeline cannot remove the policy (`DenyBootstrapIamChanges`, ADR 0004). This shortens a takeover;
-   it does not prevent the first damage. Recorded as exception E9.
+   it does not prevent the first damage. Recorded as exception E9. Extended on 2026-10-04: E9 also sets a Deny-all
+   default version of `pipeline-boundary` (see Exception E9).
 5. Resolved: not applicable while the admin is an IAM user, because only roles can be passed to a service
    (`iam:PassRole` has the resource type `role` only [A3]). At the transition, the admin becomes an
    `AWSReservedSSO_` role, which "is only modifiable by AWS" and is changed only from the Identity Center
@@ -195,6 +208,7 @@ Upgrading to the Paid plan: when the credits run out or the 6-month Free plan en
 - [B1] Billing, activating access to the Billing and Cost Management console: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/control-access-billing.html
 - [S3M] Amazon S3, configuring MFA delete: https://docs.aws.amazon.com/AmazonS3/latest/userguide/MultiFactorAuthenticationDelete.html
 - [A3] AWS service reference for IAM: https://servicereference.us-east-1.amazonaws.com/v1/iam/iam.json
+- [V1] IAM, Versioning IAM policies (checked 2026-10-03): https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-versioning.html
 - [I4] IAM Identity Center troubleshooting, "Cannot perform the operation on the protected role": https://docs.aws.amazon.com/singlesignon/latest/userguide/troubleshooting.html
 - [C1] AWS CLI, login with console credentials: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html
 - [C2] AWS Sign-In, sign in through the AWS CLI: https://docs.aws.amazon.com/signin/latest/userguide/command-line-sign-in.html

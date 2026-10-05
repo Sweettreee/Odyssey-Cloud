@@ -21,6 +21,11 @@ Status: Draft (from `docs/vision.md`) | Final (agreed on YYYY-MM-DD)
 ### Before moving on (I can explain…)
 - [ ] …
 
+### Targets (agreed at Step 1)
+- Availability: …
+- Latency: …
+- AWS budget allocation: … USD/month (`docs/vision.md` §5.1)
+
 ## 2. Learning notes
 
 ### <Topic>

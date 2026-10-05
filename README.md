@@ -43,7 +43,7 @@ The phases are ordered by dependency and risk, not by fixed dates.
 ## Principles
 
 - **Infrastructure as Code.** Every resource is created through code and deployed through CI/CD. Any exception is recorded in an ADR.
-- **Human-in-the-loop.** The AI can read and create freely. Modifying, destructive, or externally visible actions require confirmation, enforced by permissions rather than prompts.
+- **Human-in-the-loop.** The AI can read freely. Every infrastructure change it proposes, including creating, starting, and stopping a resource, is applied through the pipeline only after my approval. Externally visible actions also require confirmation. Both are enforced by permissions rather than prompts.
 - **Fixed budgets.** AWS: target under USD 20/month, ceiling USD 25/month. AI API: under USD 10/month. Subscriptions are not included.
 - **Security logging.** Access and actions are logged across the whole platform.
 - **Simplicity.** Each design is the simplest one that meets the constraints. No resume-driven technology choices.

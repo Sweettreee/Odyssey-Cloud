@@ -36,7 +36,7 @@ the actions that cannot be done as code are listed and controlled.
 | Traffic | Not applicable. |
 | Compute | Not applicable. |
 | Data | Bucket: versioning on, default encryption, all public access blocked. State never in Git. |
-| Security | Bootstrap owns the pipeline roles and the state bucket; the pipeline has no permission on the bootstrap module. No identity gets bucket delete permission. |
+| Security | Bootstrap owns the pipeline roles and the state bucket; the pipeline has no permission on the bootstrap module. The pipeline cannot delete state or the bucket (P4, ADR 0004). The IAM user admin and root can; versioning keeps plain deletes recoverable, and `prevent_destroy` blocks deletion through Terraform. |
 | Cost | ~0 (KB-scale objects, few requests). |
 | Observability | Bucket and role changes appear in CloudTrail management events (D7). Bootstrap drift is checked with `terraform plan`. |
 
@@ -54,6 +54,17 @@ the bucket it creates (C-1), for two reasons:
    so it can be reviewed and checked for drift, and every resource after bootstrap follows the IaC rule.
 2. Separating bootstrap from main means the pipeline cannot modify its own permissions or
    its state store, and a failure in main cannot spread to them.
+
+**State bucket deletion guard:** the bucket resource in `bootstrap` sets
+`lifecycle { prevent_destroy = true }`. "When `prevent_destroy` is set to `true`, Terraform rejects
+plans that would destroy the infrastructure object associated with the resource and returns an error"
+([Terraform, lifecycle](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle)).
+- Limits: "This rule doesn't prevent Terraform from destroying a resource if you remove its
+  configuration" (same page). It does not stop deletion from the console or CLI.
+- S3 deletes only an empty bucket; with versioning, every object version must be deleted first
+  ([S3, Deleting a general purpose bucket](https://docs.aws.amazon.com/AmazonS3/latest/userguide/delete-bucket.html)).
+  Inference, verify in Step 4: the AWS provider's `force_destroy` would empty the bucket first.
+- Accepted: the IAM user admin and root can still delete state outside Terraform.
 
 ## Bootstrap exceptions
 
@@ -73,6 +84,7 @@ Only the items below may be done outside code. Any other manual change is a viol
 
 **E7 procedure:** change via pull request only, with the local `terraform plan` output
 attached; review and merge; apply only from the merged `main`, with the E3 identity.
+When the change touches a `bootstrap` IAM policy (for example P4), re-run the recorded IAM policy simulator checks and attach the results to the pull request.
 This covers later changes too (for example, widening the apply role's permissions),
 so keep the `bootstrap` module small and rarely changed.
 
@@ -90,7 +102,8 @@ so keep the `bootstrap` module small and rarely changed.
 ## Consequences
 - Easier: the pipeline's blast radius excludes its own permissions and state; bootstrap drift is visible.
 - Harder: two root modules to maintain; bootstrap changes need a human apply and discipline.
-- The bucket holds its own module's state; it is protected by versioning and by granting delete to no one.
+- The bucket holds its own module's state; it is protected by versioning, by P4 for the pipeline, and by
+  `prevent_destroy` for Terraform runs. The IAM user admin and root can still delete it outside Terraform (accepted).
 - Actions taken before CloudTrail is on (D7) leave no audit trail except this ADR,
   so Step 4 turns on CloudTrail as early as possible. Whether CloudTrail belongs to
   `bootstrap` or `main` is decided in D7.

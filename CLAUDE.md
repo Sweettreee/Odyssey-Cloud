@@ -105,7 +105,7 @@ Every Phase follows these steps **in order**.
 
 | Step | What happens |
 |---|---|
-| **1. Learning Brief review** | The Brief in `docs/vision.md` is only a guideline. Propose additions and removals for this Phase. After I agree, record the final list in the phase note. |
+| **1. Learning Brief review** | The Brief in `docs/vision.md` is only a guideline. Propose additions and removals for this Phase. After I agree, record the final list in the phase note. Also propose this Phase's availability and latency targets and confirm its line in the AWS budget allocation (`docs/vision.md` §5.1); after I agree, record them in the phase note. |
 | **2. Learning** | Teach one "Before starting" topic at a time, following §3. After each topic, write 1–3 lines of key takeaways in the phase note and check the topic off once I confirm I understand it. |
 | **3. Design & decisions** | For each design question, present the problem and constraints, 2–3 options, and a 6-Layer check (Traffic, Compute, Data, Security, Cost, Observability). I decide. Write an ADR from `docs/templates/adr.md` and link it in the phase note. |
 | **4. Implementation** | Break the work into small steps. For each step: explain what, why, and the alternatives; wait for approval; make the change; show me what changed. Log each step in the phase note. |
@@ -164,7 +164,7 @@ These rules always apply, even if I ask casually.
 - Do not use subagents for work that writes files or runs commands. Subagents may not inherit this file or the permission rules.
 
 **Budget**
-- Separate monthly budgets in USD. AWS: target under USD 20, ceiling USD 25 (a Route 53 domain counts here). AI API (agent): under USD 10, tracked manually. Usage covered by credits counts as cost. Subscriptions (for example, Claude Code and Slack) are not included.
+- Separate monthly budgets in USD. AWS: target under USD 20, ceiling USD 25 (a Route 53 domain counts here). AI API (agent): under USD 10, capped by a provider-side monthly spend limit and tracked manually. Usage covered by credits counts as cost. Subscriptions (for example, Claude Code and Slack) are not included.
 - Flag the cost impact of every design option.
 - Never propose exceeding a ceiling without first laying out the options and trade-offs and asking me.
 
@@ -174,7 +174,7 @@ These rules always apply, even if I ask casually.
   - Gate: every part can be explained on a blank page. Then compare in order: fewest moving parts, then least ongoing operation.
   - Cost is a hard constraint, not a simplicity criterion.
 - **Infrastructure as Code:** all infrastructure is code, deployed through CI/CD. Console use is read-only, except for exceptions recorded in an ADR.
-- **Human-in-the-loop:** modifying or destructive actions, and delegated tasks with external effects, require confirmation enforced by permissions, not by prompts.
+- **Human-in-the-loop:** every infrastructure change, including create, start, and stop, goes through code and the pipeline after my approval; delegated tasks with external effects require confirmation. Both are enforced by permissions, not by prompts.
 - **Staged rollout:** rule-based components come first. They later become the agent's tools and stay as fallbacks.
 - **Security logging:** access and actions are logged across the whole platform.
 - **UI/UX:** a beautiful UI/UX is a requirement.
