@@ -65,7 +65,7 @@ Decision (ADR 0007 (f)): no subject customization; S15 is removed. Each trust ch
 - Apply (P3): `sub` = `repo:Sweettreee@<OWNER_ID>/Odyssey-Cloud@<REPO_ID>:environment:production`;
   `ref` = `refs/heads/main`; and `aws:RequestedRegion` = `ap-northeast-2` (ADR 0007 (e)).
 
-Inference: the plan `sub` with IDs; the docs show no `pull_request` example in the immutable format.
+Inference: the plan `sub` with IDs; the docs show no `pull_request` example in the immutable format. Confirmed 2026-10-06 with a real token (phase note §4).
 
 Verification (Step 4): verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing **only those
 three claims, never the whole token** (the repo is public). A wrong guess makes the trust fail closed. Never widen a pattern just

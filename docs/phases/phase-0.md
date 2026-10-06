@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** Real-token claim check (sub, ref, actor_id) with a test workflow, before E1.
+**Next action:** Delete the temporary OIDC workflow (PR), then E1.
 **Last updated:** 2026-10-06
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -211,6 +211,7 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-06 | E8: production (S1–S4) | Created `production` (a misnamed draft environment was deleted first). GitHub REST GET: reviewer = Sweettreee, prevent_self_review false, branch policy `main` only, can_admins_bypass false (field not in the documented schema but returned) |
 | 2026-10-06 | Repository IDs | <OWNER_ID> = 99391603, <REPO_ID> = 1373993467 (GitHub REST `repos/Sweettreee/Odyssey-Cloud`) |
 | 2026-10-06 | Fork-PR test | No second account. Option A: P1 adds `actor_id` = my GitHub user ID (ADR 0004 (a)). Docs check: no GitHub sentence on `id-token` for fork PRs, no fork claim; AWS lists `actor_id` as a trust-policy key |
+| 2026-10-06 | Real-token claim check | P1 shape (PR #6): sub = repo:Sweettreee@99391603/Odyssey-Cloud@1373993467:pull_request, ref = refs/pull/6/merge, actor_id = 99391603. P3 shape (workflow_dispatch on main, production approved): sub = …:environment:production, ref = refs/heads/main, actor_id = 99391603. All match ADR 0004 |
 
 ## 5. Verification
 
@@ -248,7 +249,7 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 - E8 ordering: create `production` and verify S1–S4 before E4. Done 2026-10-06 (see §4).
 - ~~Fork-PR `id-token` test before E4.~~ Replaced 2026-10-06 by the P1 `actor_id` condition (ADR 0004 (a)); accept path checked in Step 4.
 - `gh` login hygiene: log in only when needed and `gh auth logout` afterwards, or use a short-lived read-only token in `GH_TOKEN`.
-- Fill `<OWNER_ID>`/`<REPO_ID>`/`<ACTOR_ID>`; verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing only those three claims (never the whole token); confirm `gh api` endpoints for E8 checks.
+- Fill `<OWNER_ID>`/`<REPO_ID>`/`<ACTOR_ID>`; verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing only those three claims (never the whole token); confirm `gh api` endpoints for E8 checks. Done 2026-10-06 (see §4); placeholders are filled when the trust policies are written.
 - E1 on the Free plan; right after E1, check that the services Phase 0 needs are available on the Free plan.
 - E2/E3: root and the admin each register one synced passkey (iCloud Keychain). E6: root runs "Activate IAM Access" once.
 - Pin Terraform `~> 1.15.0` (one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
