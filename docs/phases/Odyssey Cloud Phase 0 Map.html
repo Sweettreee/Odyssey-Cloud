@@ -212,7 +212,7 @@ a { color: inherit; }
     <tbody>
       <tr><td>1</td><td>Me → AWS root</td><td>Console sign-in with root's synced passkey</td><td>Only for E2 and E6. No root access keys. Every root call raises G1.</td></tr>
       <tr><td>2</td><td>Me → IAM user admin</td><td><code>aws login</code> through the console sign-in, admin's synced passkey</td><td>Temporary credentials up to 12 h, cached in <code>~/.aws/login/cache</code>. No access keys. Applies <code>bootstrap</code> only from merged <code>main</code> (E7).</td></tr>
-      <tr><td>3</td><td>Plan job → <code>pipeline-plan</code></td><td>GitHub OIDC token. P1: <code>sub</code> = <code>…:pull_request</code>, <code>ref</code> like <code>refs/pull/*/merge</code></td><td>Same-repo PRs only; fork PRs fail closed. Read-only, no bootstrap state, no DynamoDB item reads.</td></tr>
+      <tr><td>3</td><td>Plan job → <code>pipeline-plan</code></td><td>GitHub OIDC token. P1: <code>sub</code> = <code>…:pull_request</code>, <code>ref</code> like <code>refs/pull/*/merge</code>, <code>actor_id</code> = my account</td><td>Same-repo PRs only; fork PRs fail closed. Read-only, no bootstrap state, no DynamoDB item reads.</td></tr>
       <tr><td>4</td><td>Apply job → <code>pipeline-apply</code></td><td>GitHub OIDC token. P3: <code>sub</code> = <code>…:environment:production</code>, <code>ref</code> = <code>refs/heads/main</code>, Region = <code>ap-northeast-2</code></td><td>Only after my approval in <code>production</code>. Admin rights cut by P4. Every successful assumption raises G2.</td></tr>
       <tr><td>5</td><td>AWS → Slack</td><td>Amazon Q Developer, Slack workspace authorized once (E10)</td><td>Channel role and guardrail have no permissions. Slack IDs live in the ignored <code>*.tfvars</code> file.</td></tr>
       <tr><td>6</td><td>AWS → email</td><td>AWS Budgets sends to my address</td><td>Budget alerts only. The address lives in the ignored <code>*.tfvars</code> file, <code>sensitive = true</code>.</td></tr>
@@ -248,7 +248,7 @@ a { color: inherit; }
 
       <rect class="box" x="328" y="273" width="100" height="64" rx="6"/>
       <text class="num" x="336" y="289">3</text><text class="t" x="348" y="290">Assume plan</text>
-      <text class="s" x="336" y="307">P1: sub=PR</text><text class="s" x="336" y="322">ref=pull/*</text>
+      <text class="s" x="336" y="307">P1: sub=PR</text><text class="s" x="336" y="322">ref, actor_id</text>
 
       <rect class="box" x="438" y="273" width="100" height="64" rx="6"/>
       <text class="num" x="446" y="289">4</text><text class="t" x="458" y="290">plan main</text>
@@ -545,7 +545,7 @@ a { color: inherit; }
   </div>
 </section>
 
-<p class="muted" style="font-size:13px">Source: <code>docs/adr/0001</code>–<code>0007</code> and <code>docs/phases/phase-0.md</code>, as of 2026-10-05. Items marked “inference” in the ADRs, such as exact OIDC claim values, are verified in Step 4.</p>
+<p class="muted" style="font-size:13px">Source: <code>docs/adr/0001</code>–<code>0007</code> and <code>docs/phases/phase-0.md</code>, as of 2026-10-06. Items marked “inference” in the ADRs, such as exact OIDC claim values, are verified in Step 4.</p>
 </main>
 
 </body></html>

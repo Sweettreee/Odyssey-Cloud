@@ -5,10 +5,10 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** E8 ordering: create production and verify S1–S4 before E4.
-**Last updated:** 2026-10-05
+**Next action:** Real-token claim check (sub, ref, actor_id) with a test workflow, before E1.
+**Last updated:** 2026-10-06
 
-> **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 not started; begin with the Step 4 checklist in §6.
+> **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
 
 ## Carry-over from previous phase
 - None (first Phase).
@@ -99,7 +99,7 @@ Facts confirmed 2026-09-21: no cloud account exists yet (created in Step 4); Git
 | D1 | AWS, Seoul region (`ap-northeast-2`) | 0001 |
 | D2 | Terraform | 0002 |
 | D3 | S3 state with native lock file; separate `bootstrap` root module, state migrated into its own bucket; exceptions E1–E7; bucket `prevent_destroy` (pipeline cannot delete state; admin and root can, accepted) | 0003 |
-| D4 | GitHub Actions; OIDC plan role (ReadOnlyAccess + lock + read Denies) and apply role (Admin + boundary P4); `production` environment gate; `main`-only enforced by S3 and the OIDC `ref` condition key (S15 dropped 2026-10-02, see §6); fork PRs fail closed; GitHub settings as exception E8; CI runs `fmt -check` and `validate` (both modules) before AWS authentication | 0004 |
+| D4 | GitHub Actions; OIDC plan role (ReadOnlyAccess + lock + read Denies) and apply role (Admin + boundary P4); `production` environment gate; `main`-only enforced by S3 and the OIDC `ref` condition key (S15 dropped 2026-10-02, see §6); fork PRs fail closed; GitHub settings as exception E8; CI runs `fmt -check` and `validate` (both modules) before AWS authentication; P1 also requires `actor_id` (2026-10-06, replaces the fork-PR test) | 0004 |
 | D5 | One AWS account on the Free plan; root and an IAM user admin, each with one synced passkey; CLI via `aws login`; Organizations, Identity Center, and a sensitive-data account at the Paid-plan transition; E6 made standing; emergency stop E9 | 0005 |
 | D6 | AWS cost budget USD 20/month, credit-covered usage counted as cost; actual-spend alerts at 50/75/90/100% and 125% (= USD 25 ceiling); Budgets → unencrypted SNS topic → Amazon Q Developer → private Slack channel, plus email; in `bootstrap`; Slack authorization as exception E10; Slack stays on the Free plan | 0006 |
 | D7 | One multi-Region trail and dedicated log bucket in `bootstrap`; alerts G1–G5 via EventBridge (Seoul hub) to the ADR 0006 topic; one external access analyzer in Seoul; seven protection Denies in P4; P3 requires `ap-northeast-2`; S15 dropped in favour of the `ref` key | 0007 |
@@ -208,6 +208,9 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-05 | Control map | Option B: the reference map's crossing table (7 crossings) and P4 Deny groups serve as the control map; no separate owner-drawn table |
 | 2026-10-05 | GitHub account checklist | Owner done: passkey/security-key 2FA, unused sessions/tokens/keys/app grants removed; gh logged out |
 | 2026-10-05 | .gitignore | Terraform patterns added (*.tfstate*, .terraform/, *.tfplan, *.tfvars) |
+| 2026-10-06 | E8: production (S1–S4) | Created `production` (a misnamed draft environment was deleted first). GitHub REST GET: reviewer = Sweettreee, prevent_self_review false, branch policy `main` only, can_admins_bypass false (field not in the documented schema but returned) |
+| 2026-10-06 | Repository IDs | <OWNER_ID> = 99391603, <REPO_ID> = 1373993467 (GitHub REST `repos/Sweettreee/Odyssey-Cloud`) |
+| 2026-10-06 | Fork-PR test | No second account. Option A: P1 adds `actor_id` = my GitHub user ID (ADR 0004 (a)). Docs check: no GitHub sentence on `id-token` for fork PRs, no fork claim; AWS lists `actor_id` as a trust-policy key |
 
 ## 5. Verification
 
@@ -240,12 +243,12 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 
 ### Step 4 checklist (from ADR 0004–0006)
 - Before the first Step 4 change: I draw the trust boundaries and a one-page control map (threat → EP → control → check) on a blank page (vision §7.1). Done 2026-10-05 (option B, see §4).
-- GitHub account checklist (2FA passkey/security key, remove unused tokens/keys/grants, check `gh auth status` scopes) before creating AWS resources.
-- `.gitignore`: `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4.
-- E8 ordering: create `production` and verify S1–S4 before E4.
-- Fork-PR `id-token` test before E4 (one approved test PR from someone else's account).
+- GitHub account checklist (2FA passkey/security key, remove unused tokens/keys/grants, check `gh auth status` scopes) before creating AWS resources. Done 2026-10-05 (see §4).
+- `.gitignore`: `*.tfstate*`, `.terraform/`, `*.tfplan`, `*.tfvars` before E4. Done 2026-10-05 (see §4).
+- E8 ordering: create `production` and verify S1–S4 before E4. Done 2026-10-06 (see §4).
+- ~~Fork-PR `id-token` test before E4.~~ Replaced 2026-10-06 by the P1 `actor_id` condition (ADR 0004 (a)); accept path checked in Step 4.
 - `gh` login hygiene: log in only when needed and `gh auth logout` afterwards, or use a short-lived read-only token in `GH_TOKEN`.
-- Fill `<OWNER_ID>`/`<REPO_ID>`; verify the exact `sub` and `ref` values from a real token, printing only those two claims (never the whole token); confirm `gh api` endpoints for E8 checks.
+- Fill `<OWNER_ID>`/`<REPO_ID>`/`<ACTOR_ID>`; verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing only those three claims (never the whole token); confirm `gh api` endpoints for E8 checks.
 - E1 on the Free plan; right after E1, check that the services Phase 0 needs are available on the Free plan.
 - E2/E3: root and the admin each register one synced passkey (iCloud Keychain). E6: root runs "Activate IAM Access" once.
 - Pin Terraform `~> 1.15.0` (one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
