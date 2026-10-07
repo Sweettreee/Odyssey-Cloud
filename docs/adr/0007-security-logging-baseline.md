@@ -64,6 +64,8 @@ apply-role assumption, and (f) removal of GitHub setting S15.
     statement, deleting a log file first needs `PutBucketPolicy`, a management event that G4 alerts on.
   - Encryption: SSE-S3, the S3 default, "at no cost" [S3E]. No KMS key (USD 1/month avoided, ADR 0006 [K1]).
   - No lifecycle expiry: logs are kept indefinitely.
+  - `lifecycle { prevent_destroy = true }` on the bucket (added 2026-10-07 at Step 4), as for the state bucket
+    (ADR 0003): a plan that would delete the bucket fails at review time.
 - Log file integrity validation on. CloudTrail delivers an hourly digest file, uses "SHA-256 for hashing and SHA-256
   with RSA for digital signing", and can show whether a log file "was modified, deleted, or unchanged" [CT4].
 - E1–E3 happen before the trail exists; they are visible only in CloudTrail Event history [IT1] and in ADR 0003.

@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** Delete the temporary OIDC workflow (PR), then E1.
+**Next action:** M3 3.8: open the bootstrap PR with the plan summary and merge it; then M4 (E4 apply from merged main).
 **Last updated:** 2026-10-06
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -212,6 +212,26 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-06 | Repository IDs | <OWNER_ID> = 99391603, <REPO_ID> = 1373993467 (GitHub REST `repos/Sweettreee/Odyssey-Cloud`) |
 | 2026-10-06 | Fork-PR test | No second account. Option A: P1 adds `actor_id` = my GitHub user ID (ADR 0004 (a)). Docs check: no GitHub sentence on `id-token` for fork PRs, no fork claim; AWS lists `actor_id` as a trust-policy key |
 | 2026-10-06 | Real-token claim check | P1 shape (PR #6): sub = repo:Sweettreee@99391603/Odyssey-Cloud@1373993467:pull_request, ref = refs/pull/6/merge, actor_id = 99391603. P3 shape (workflow_dispatch on main, production approved): sub = …:environment:production, ref = refs/heads/main, actor_id = 99391603. All match ADR 0004 |
+| 2026-10-06 | E1 | AWS account created (classic sign-up, `request_type=register`) on the Free plan, Basic Support; account name `SweetTree`; account ID 186972156090; USD 100 credits; root email = my existing personal Gmail (ADR 0005) |
+| 2026-10-06 | E2 | Root MFA: one passkey (iCloud Keychain), registered in the console; no root access keys (console view). CLI checks for E1 and E2 run after E3 |
+| 2026-10-06 | E6 (Activate IAM Access) | Root activated IAM user/role access to billing information (console) |
+| 2026-10-06 | E3 | IAM user `odyssey-admin`: console password and one passkey (both iCloud Keychain), no access keys, policies AdministratorAccess and SignInLocalDevelopmentAccess (IAM console view, ADR 0005 6c) |
+| 2026-10-06 | CLI checks (E1, E2, E3) and aws login | AWS CLI 2.37.9 (official install script); `aws login` asked for the admin passkey. sts get-caller-identity = 186972156090 / user/odyssey-admin; get-account-summary: AccountMFAEnabled 1, AccountAccessKeysPresent 0; odyssey-admin: 0 access keys, 1 MFA device, 2 attached policies, no inline policies or groups. "Configure AWS skills and the AWS MCP server" prompt declined |
+| 2026-10-07 | Free plan service check | Owner: S3, CloudTrail, EventBridge, SNS, Budgets, Amazon Q Developer, IAM Access Analyzer listed on the AWS Free Tier page. Read-only calls all answered (0 resources each). The Amazon Q Developer API has no ap-northeast-2 endpoint; it is managed in us-east-2 (its console runs in us-east-2 only) |
+| 2026-10-07 | E6 check | odyssey-admin can open the Billing and Cost Management console (Free plan status shown) |
+| 2026-10-07 | E10 | Amazon Q Developer app installed through its console (us-east-2) as odyssey-admin; workspace `odyssey-cloud` State ENABLED; private alert channel created and @Amazon Q invited (channel ID kept for *.tfvars, not in the repo); 0 channel configurations (they are bootstrap code); AWSServiceRoleForAWSChatbot not created by E10 (NoSuchEntity) |
+| 2026-10-07 | Terraform | 1.16.5 installed from the official binary (SHA256 OK) to ~/.local/bin |
+| 2026-10-07 | M3 3.1 skeleton | `infra/bootstrap/`: versions.tf (`~> 1.16.0`, AWS `~> 6.23`), providers.tf (ap-northeast-2, allowed_account_ids, default_tags ManagedBy/Module), locals.tf (account ID), variables.tf (alert email, Slack IDs, sensitive). init -backend=false locked AWS provider 6.67.0; fmt and validate OK |
+| 2026-10-07 | M3 3.2 state bucket | `state.tf`: bucket `odyssey-tfstate-186972156090` (<STATE_BUCKET>), versioning, SSE-S3 and bucket Block Public Access declared so plan shows drift (option B), prevent_destroy; `account.tf`: account-level S3 Block Public Access (ADR 0004 (f)). fmt and validate OK |
+| 2026-10-07 | M3 3.3a pipeline roles | Policy JSON as files + templatefile() (option A2). `pipeline.tf`: GitHub OIDC provider (no thumbprint), `pipeline-plan` (P1, ReadOnlyAccess) and `pipeline-apply` (P3, AdministratorAccess; boundary added in 3.3c) under `/bootstrap/`; GitHub IDs in locals.tf. P1 and P3 files identical to ADR 0004 after placeholder substitution; rendered JSON checked; fmt and validate OK |
+| 2026-10-07 | M3 3.3b P2 | `policies/p2-plan-inline.json` + `aws_iam_role_policy.pipeline_plan_p2` (name `p2-state-lock-and-read-denies`); bucket name taken from the state bucket resource. Identical to ADR 0004 P2 after substitution; rendered JSON valid; fmt and validate OK |
+| 2026-10-07 | M3 3.3c P4 | `policies/p4-boundary.json` + `aws_iam_policy.pipeline_boundary` (`/bootstrap/pipeline-boundary`), attached as the `pipeline-apply` permissions boundary; log bucket name `bootstrap-cloudtrail-186972156090` (<LOG_BUCKET>) in locals.tf. P1–P4 identical to ADR 0004 after substitution; P4 4,214 of 6,144 characters; fmt and validate OK. Pre-apply validate-policy and simulator runs declined (owner, 2026-10-07); the simulator checks stay in M6 |
+| 2026-10-07 | M3 3.4 budget alerts | `alerts.tf`: SNS `bootstrap-alerts` (topic policy: Budgets and `rule/bootstrap-*` publish only, option A), budget `bootstrap-monthly-cost` (USD 20, actual 50/75/90/100/125%, `include_credit = false`, email + topic), channel role `bootstrap-chatbot-channel` (no permissions), Q Developer channel `bootstrap-alerts` in us-east-2 with guardrail `AWSDenyAll` (option A; ADR 0006 updated), logging NONE. fmt and validate OK. If the Q Developer subscription fails at M4 because of the topic policy, add a statement then |
+| 2026-10-07 | M3 3.5 trail | `trail.tf`: log bucket `bootstrap-cloudtrail-186972156090` (versioning, SSE-S3, Block Public Access, prevent_destroy (option A; ADR 0007 (a) updated)), bucket policy (two CloudTrail statements limited by `aws:SourceArn`, deny object deletes to every principal), trail `bootstrap-trail` (multi-Region, log file validation, advanced selectors: all management events and state bucket object data events). fmt and validate OK |
+| 2026-10-07 | M3 3.6a event rules | `events.tf`: Seoul rules G1–G5 and `bootstrap-access-analyzer`, `bootstrap-forward` in us-east-1/us-east-2/us-west-2 (union of G1, G3, G4, G5; G4 as seven parts, no nested `$or`), role `/bootstrap/event-forwarder` (PutEvents to the Seoul default bus), all rules `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`. fmt and validate OK. `aws events test-event-pattern` with hand-built CloudTrail-shaped events: 30 cases (match and no-match for every rule and the forwarder), 0 failed; real events are checked in M6 |
+| 2026-10-07 | M3 3.6b alert messages | `events.tf`: input transformers for the six Seoul rules to SNS `bootstrap-alerts` (Q Developer custom notifications; allowlisted fields per ADR 0007 (b): 9 for G1/G3/G4/G5, 5 for G2, 8 for Access Analyzer); raw-text templates because jsonencode() escapes `<` as `\u003c` (checked); run link as a plain URL. Local render with sample values: valid JSON, every placeholder defined and used, length limits met. `checks/test_event_patterns.py` kept in the repo for E7 re-runs (delete when no longer useful). Slack rendering is checked in M6 |
+| 2026-10-07 | M3 3.7 analyzer | `analyzer.tf`: `bootstrap-external-access`, type ACCOUNT, ap-northeast-2. Creating it adds `AWSServiceRoleForAccessAnalyzer` (record at M4). fmt and validate OK |
+| 2026-10-07 | M3 3.8 local plan | Owner ran `AWS_PROFILE=odyssey-admin terraform plan -out=bootstrap.tfplan` in `infra/bootstrap` (local state, empty): Plan: 44 to add, 0 to change, 0 to destroy, matching the 44 resources in the code. `terraform.tfvars` and the plan file are git-ignored. Next: PR with the plan summary (E7), merge, then M4 |
 
 ## 5. Verification
 
@@ -236,6 +256,11 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
   (`...:pull_request`) plus `token.actions.githubusercontent.com:ref` like `refs/pull/*/merge`; P3 checks the default
   `sub` (`...:environment:production`) plus `ref` = `refs/heads/main`. `sub` stays because IAM requires it for GitHub.
   Fallback if the `ref` key does not match in Step 4: restore S15 (option A).
+- Free plan ends on 2027-04-06 or when the USD 100 credits run out, whichever comes first (Billing console, 2026-10-06).
+  This is the ADR 0005 trigger for the Paid-plan transition.
+- (M3) The Amazon Q Developer API has no ap-northeast-2 endpoint; create the Slack channel configuration with
+  `region = "us-east-2"` (AWS provider 6.x Region-aware resources; no provider alias). Seoul SNS topics are supported.
+- (M5) The apply workflow must request the role by its full ARN with the path (`arn:aws:iam::186972156090:role/bootstrap/pipeline-apply`): G2 matches `requestParameters.roleArn` exactly (inference: CloudTrail records the ARN as requested).
 
 ### Hand-offs from ADR 0004–0006
 - ~~D5: admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account (ADR 0004 (e)).~~ Done: ADR 0005.
@@ -250,13 +275,13 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 - ~~Fork-PR `id-token` test before E4.~~ Replaced 2026-10-06 by the P1 `actor_id` condition (ADR 0004 (a)); accept path checked in Step 4.
 - `gh` login hygiene: log in only when needed and `gh auth logout` afterwards, or use a short-lived read-only token in `GH_TOKEN`.
 - Fill `<OWNER_ID>`/`<REPO_ID>`/`<ACTOR_ID>`; verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing only those three claims (never the whole token); confirm `gh api` endpoints for E8 checks. Done 2026-10-06 (see §4); placeholders are filled when the trust policies are written.
-- E1 on the Free plan; right after E1, check that the services Phase 0 needs are available on the Free plan.
-- E2/E3: root and the admin each register one synced passkey (iCloud Keychain). E6: root runs "Activate IAM Access" once.
-- Pin Terraform `~> 1.15.0` (one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
-- Verify that the admin's MFA is asked during `aws login`.
+- E1 on the Free plan; right after E1, check that the services Phase 0 needs are available on the Free plan. Done 2026-10-07 (see §4).
+- E2/E3: root and the admin each register one synced passkey (iCloud Keychain). E6: root runs "Activate IAM Access" once. Done 2026-10-06/07 (see §4).
+- Pin Terraform `~> 1.16.0` (1.16.5; one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
+- Verify that the admin's MFA is asked during `aws login`. Done 2026-10-06 (see §4).
 - P4 includes `iam:DeleteLoginProfile`; make sure a `bootstrap` apply does not remove `emergency-deny-all` (E9).
-- E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role (record it under E10 if so). Verify that budget and custom notifications render with an empty channel role and guardrail.
-- Confirm how the current Budgets API and AWS provider express `IncludeCredit`. Alert email and Slack workspace and channel IDs go in the ignored `*.tfvars` with `sensitive = true`; check that plans attached to PRs do not show them.
+- E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role (record it under E10 if so). Verify that budget and custom notifications render with an empty channel role and guardrail. E10 done 2026-10-07 (see §4); the service-linked role did not appear at E10, so recheck after the channel configuration is applied (M4). The render check stays open.
+- Confirm how the current Budgets API and AWS provider express `IncludeCredit`. Alert email and Slack workspace and channel IDs go in the ignored `*.tfvars` with `sensitive = true`; check that plans attached to PRs do not show them. IncludeCredit done 2026-10-07: API default `true`; provider `cost_types { include_credit = false }` counts credit-covered usage (see §4).
 - Exit criterion 3: a temporary USD 0.01 budget (credits counted, same five notifications and topic), added and removed through E7; every alert arrives in Slack and by email.
 - (D7) Alert render test: empty variables, " | " separators, the Slack link containing `<roleSessionName>` (fall back
   to a plain URL if the nested angle brackets conflict), and whether `\n` in the description renders as a line break.

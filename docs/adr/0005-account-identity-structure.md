@@ -65,11 +65,15 @@ Chosen: D.
 ### Stage 1 (now, Free plan)
 - One AWS account (E1) on the Free plan, to keep the Free Tier credits.
 - Root: MFA registered (E2), then sealed. No root access keys.
+- Root email: my existing personal Gmail address (decided 2026-10-06 at E1). Known limits: AWS recommends that the
+  root email "should not be used for other purposes" [M2]; that Gmail account plus my phone number is a root
+  recovery path [M2]; one person holds both recovery channels. The Gmail account has no passkey or security-key
+  2FA (owner's choice, 2026-10-06); accepted.
 - Admin identity (E3): one IAM user with a console password and MFA. Policies: `AdministratorAccess` and
   `SignInLocalDevelopmentAccess`. No access keys.
 - CLI for E4, E5, and E7: `aws login` (AWS CLI >= 2.32.0). Temporary credentials, up to 12 hours.
-- Terraform `~> 1.15.0` (the S3 backend supports `aws login` only from 1.15.0 [T3]) and AWS provider `~> 6.23`
-  (`aws login` works from 6.23.0 [T4]); bounds per ADR 0004 (e) "Versions".
+- Terraform `~> 1.16.0` (the S3 backend supports `aws login` from 1.15.0 [T3]; 1.16 chosen 2026-10-07, ADR 0004 (e))
+  and AWS provider `~> 6.23` (`aws login` works from 6.23.0 [T4]); bounds per ADR 0004 (e) "Versions".
 - Do not use `source_profile` role chaining with `aws login` (#45817 [T6]).
 
 ### Trigger
@@ -202,7 +206,7 @@ Upgrading to the Paid plan: when the credits run out or the 6-month Free plan en
 - [R2] Centralize root access for member accounts: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.html
 - [R3] Revoke IAM role temporary security credentials: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_revoke-sessions.html
 - [M1] AWS Multi-factor authentication in IAM: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html
-- [M2] Root user best practices: https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html
+- [M2] Root user best practices (checked 2026-10-06): https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html
 - [MS] IAM, check MFA status: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_checking-status.html
 - [AP1] Apple, About the security of passkeys: https://support.apple.com/en-us/102195
 - [B1] Billing, activating access to the Billing and Cost Management console: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/control-access-billing.html
