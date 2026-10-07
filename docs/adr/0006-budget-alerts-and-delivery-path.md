@@ -70,7 +70,7 @@ Chosen: (a) B, (b) A, (c) A.
 | Traffic | No inbound traffic. Budgets (and EventBridge in D7) publish to SNS; Amazon Q Developer posts to Slack. |
 | Compute | None: no server and no function. |
 | Data | Alert messages only: amounts and thresholds, and event summaries in D7. No secrets (inference). No server-side encryption on the topic. |
-| Security | The topic policy lets Budgets publish only for this account [BS1]. The channel role and the guardrail are both empty and explicit [CF2], under the IAM path `/bootstrap/`. D7's Denies keep the pipeline from removing the path (EP-22). E10 links the Slack workspace to the account. |
+| Security | The topic policy lets Budgets publish only for this account [BS1]. The channel role (under the IAM path `/bootstrap/`) has no permissions, and the guardrail is the AWS managed `AWSDenyAll` [CF2]. D7's Denies keep the pipeline from removing the path (EP-22). E10 links the Slack workspace to the account. |
 | Cost | USD 0/month. Budget monitoring and notifications are free [BP1]; Amazon Q Developer has no additional charge [QP1]; SNS includes 1 million requests and 100,000 HTTP/S deliveries per month at no charge [SNS1]; no KMS key (USD 1/month avoided [K1]). |
 | Observability | Alerts lag by hours and do not stop spending [B1]. Budget changes are visible through CloudTrail and EventBridge [EB1] (D7). |
 
@@ -92,8 +92,9 @@ Chosen: (a) B, (b) A, (c) A.
 - One Amazon Q Developer Slack channel configuration (Terraform `aws_chatbot_slack_channel_configuration`),
   subscribed to the topic, posting to one private Slack channel.
 - Channel role: trusted by Amazon Q Developer only, with no permissions, as in the sample [DS1].
-  Guardrail: set explicitly to a policy with no permissions, instead of the default `AdministratorAccess` [CF2].
-  The role and the guardrail policy use the IAM path `/bootstrap/`, so P4 `DenyBootstrapIamChanges` covers them (ADR 0004).
+  Guardrail: set explicitly to a policy with no permissions, instead of the default `AdministratorAccess` [CF2]:
+  the AWS managed policy `AWSDenyAll` (changed 2026-10-07 at Step 4; nobody can edit an AWS managed policy).
+  The role uses the IAM path `/bootstrap/`, so P4 `DenyBootstrapIamChanges` covers it (ADR 0004).
 
 ### The owner's reference sample (Deadline Cloud)
 - Adopted: SNS → Amazon Q Developer → Slack, plus email.

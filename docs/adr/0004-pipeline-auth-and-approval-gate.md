@@ -263,6 +263,10 @@ values, as in the first version of this ADR.
 
 ## Policies
 
+Implementation (2026-10-07): `infra/bootstrap/policies/p1-plan-trust.json`, `p2-plan-inline.json`,
+`p3-apply-trust.json`, and `p4-boundary.json` must equal the JSON below after replacing each `<X>` with
+`${x}`; the E7 pull request shows that check.
+
 ### P1. Plan role trust policy
 ```json
 {
