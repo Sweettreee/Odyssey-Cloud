@@ -1,0 +1,208 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowWithinBoundary",
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyBootstrapIamChanges",
+      "Effect": "Deny",
+      "NotAction": ["iam:Get*", "iam:List*"],
+      "Resource": [
+        "arn:aws:iam::${account_id}:role/bootstrap/*",
+        "arn:aws:iam::${account_id}:policy/bootstrap/*",
+        "arn:aws:iam::${account_id}:oidc-provider/token.actions.githubusercontent.com"
+      ]
+    },
+    {
+      "Sid": "DenyStateBucketConfig",
+      "Effect": "Deny",
+      "NotAction": ["s3:Get*", "s3:List*"],
+      "Resource": "arn:aws:s3:::${state_bucket}"
+    },
+    {
+      "Sid": "DenyStateObjectHistoryAndAcl",
+      "Effect": "Deny",
+      "NotAction": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::${state_bucket}/*"
+    },
+    {
+      "Sid": "DenyBootstrapState",
+      "Effect": "Deny",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::${state_bucket}/bootstrap/*"
+    },
+    {
+      "Sid": "DenyMainStateDelete",
+      "Effect": "Deny",
+      "Action": "s3:DeleteObject",
+      "Resource": "arn:aws:s3:::${state_bucket}/main/terraform.tfstate"
+    },
+    {
+      "Sid": "RequireBoundaryOnIamWrites",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:CreateUser",
+        "iam:AttachUserPolicy",
+        "iam:DetachUserPolicy",
+        "iam:PutUserPolicy",
+        "iam:DeleteUserPolicy",
+        "iam:PutUserPermissionsBoundary"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::${account_id}:policy/bootstrap/pipeline-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "DenyBoundaryRemoval",
+      "Effect": "Deny",
+      "Action": ["iam:DeleteRolePermissionsBoundary", "iam:DeleteUserPermissionsBoundary"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyIamGroupWrites",
+      "Effect": "Deny",
+      "Action": ["iam:CreateGroup", "iam:UpdateGroup", "iam:PutGroupPolicy", "iam:AttachGroupPolicy", "iam:AddUserToGroup"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyLongLivedCredentials",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateAccessKey",
+        "iam:UpdateAccessKey",
+        "iam:CreateLoginProfile",
+        "iam:UpdateLoginProfile",
+        "iam:DeleteLoginProfile",
+        "iam:CreateServiceSpecificCredential",
+        "iam:ResetServiceSpecificCredential",
+        "iam:UpdateServiceSpecificCredential",
+        "iam:UploadSSHPublicKey",
+        "iam:UpdateSSHPublicKey",
+        "iam:UploadSigningCertificate",
+        "iam:UpdateSigningCertificate"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyMfaChanges",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateVirtualMFADevice",
+        "iam:EnableMFADevice",
+        "iam:DeactivateMFADevice",
+        "iam:DeleteVirtualMFADevice",
+        "iam:ResyncMFADevice"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyNewIdentityProviders",
+      "Effect": "Deny",
+      "Action": ["iam:CreateOpenIDConnectProvider", "iam:CreateSAMLProvider", "iam:UpdateSAMLProvider"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyAccountLevelChanges",
+      "Effect": "Deny",
+      "Action": [
+        "organizations:*",
+        "account:*",
+        "sso:*",
+        "identitystore:*",
+        "iam:UpdateAccountPasswordPolicy",
+        "iam:DeleteAccountPasswordPolicy",
+        "iam:CreateAccountAlias",
+        "iam:DeleteAccountAlias",
+        "s3:PutAccountPublicAccessBlock"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyOutsideSeoul",
+      "Effect": "Deny",
+      "NotAction": [
+        "iam:*",
+        "sts:*",
+        "cloudfront:*",
+        "route53:*",
+        "route53domains:*",
+        "support:*",
+        "trustedadvisor:*",
+        "health:*",
+        "organizations:*",
+        "budgets:*",
+        "ce:*",
+        "cur:*",
+        "aws-portal:*",
+        "pricing:*",
+        "waf:*",
+        "wafv2:*",
+        "shield:*",
+        "globalaccelerator:*",
+        "networkmanager:*"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:RequestedRegion": "ap-northeast-2"
+        }
+      }
+    },
+    {
+      "Sid": "DenyLogBucketConfig",
+      "Effect": "Deny",
+      "NotAction": ["s3:Get*", "s3:List*"],
+      "Resource": "arn:aws:s3:::${log_bucket}"
+    },
+    {
+      "Sid": "DenyLogObjects",
+      "Effect": "Deny",
+      "Action": "s3:*",
+      "Resource": "arn:aws:s3:::${log_bucket}/*"
+    },
+    {
+      "Sid": "DenyLoggingAndAlertServices",
+      "Effect": "Deny",
+      "Action": ["cloudtrail:*", "budgets:*", "chatbot:*", "access-analyzer:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyAlertRuleChanges",
+      "Effect": "Deny",
+      "NotAction": ["events:Describe*", "events:List*"],
+      "Resource": "arn:aws:events:*:${account_id}:rule/bootstrap-*"
+    },
+    {
+      "Sid": "DenyDefaultBusUpdate",
+      "Effect": "Deny",
+      "Action": "events:UpdateEventBus",
+      "Resource": "arn:aws:events:*:${account_id}:event-bus/default"
+    },
+    {
+      "Sid": "DenyEventBusPermissionChanges",
+      "Effect": "Deny",
+      "Action": ["events:PutPermission", "events:RemovePermission"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyAlertTopicChanges",
+      "Effect": "Deny",
+      "NotAction": ["sns:Get*", "sns:List*"],
+      "Resource": "arn:aws:sns:*:${account_id}:bootstrap-*"
+    }
+  ]
+}

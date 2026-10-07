@@ -1,0 +1,33 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "UseMainStateLock",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::${state_bucket}/main/terraform.tfstate.tflock"
+    },
+    {
+      "Sid": "DenyObjectReadsExceptMainState",
+      "Effect": "Deny",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+      "NotResource": [
+        "arn:aws:s3:::${state_bucket}/main/terraform.tfstate",
+        "arn:aws:s3:::${state_bucket}/main/terraform.tfstate.tflock"
+      ]
+    },
+    {
+      "Sid": "DenyDynamoDBItemReads",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:PartiQLSelect",
+        "dynamodb:GetRecords"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

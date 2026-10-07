@@ -1,0 +1,21 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GitHubSameRepoPullRequests",
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::${account_id}:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:Sweettreee@${owner_id}/Odyssey-Cloud@${repo_id}:pull_request",
+          "token.actions.githubusercontent.com:actor_id": "${actor_id}"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:ref": "refs/pull/*/merge"
+        }
+      }
+    }
+  ]
+}
