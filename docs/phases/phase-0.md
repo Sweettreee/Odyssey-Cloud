@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** M3 3.8: open the bootstrap PR with the plan summary and merge it; then M4 (E4 apply from merged main).
+**Next action:** M4 E5: add the S3 backend (PR, E7), then `terraform init -migrate-state` from merged main.
 **Last updated:** 2026-10-06
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -232,6 +232,8 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-07 | M3 3.6b alert messages | `events.tf`: input transformers for the six Seoul rules to SNS `bootstrap-alerts` (Q Developer custom notifications; allowlisted fields per ADR 0007 (b): 9 for G1/G3/G4/G5, 5 for G2, 8 for Access Analyzer); raw-text templates because jsonencode() escapes `<` as `\u003c` (checked); run link as a plain URL. Local render with sample values: valid JSON, every placeholder defined and used, length limits met. `checks/test_event_patterns.py` kept in the repo for E7 re-runs (delete when no longer useful). Slack rendering is checked in M6 |
 | 2026-10-07 | M3 3.7 analyzer | `analyzer.tf`: `bootstrap-external-access`, type ACCOUNT, ap-northeast-2. Creating it adds `AWSServiceRoleForAccessAnalyzer` (record at M4). fmt and validate OK |
 | 2026-10-07 | M3 3.8 local plan | Owner ran `AWS_PROFILE=odyssey-admin terraform plan -out=bootstrap.tfplan` in `infra/bootstrap` (local state, empty): Plan: 44 to add, 0 to change, 0 to destroy, matching the 44 resources in the code. `terraform.tfvars` and the plan file are git-ignored. Next: PR with the plan summary (E7), merge, then M4 |
+| 2026-10-07 | M3 PR | Bootstrap code merged to `main` through a PR with the plan summary (E7 procedure) |
+| 2026-10-07 | M4 E4 apply | Owner applied from merged `main` with local state: 44 added. Checks (read-only): `terraform plan` No changes (E4 check); trail IsLogging true, no delivery error; pipeline-apply boundary = pipeline-boundary; SNS subscription https://global.sns-api.chatbot.amazonaws.com (topic policy option A works); Q Developer channel ENABLED with AWSDenyAll; 6 Seoul rules and 3 forwarders in state ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS; Access Analyzer active findings only for pipeline-plan and pipeline-apply (expected). Service-linked roles created by AWS outside code: AWSServiceRoleForAccessAnalyzer and AWSServiceRoleForAWSChatbot (the latter appeared with the channel configuration, not at E10) |
 
 ## 5. Verification
 
