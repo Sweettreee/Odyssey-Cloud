@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** M3: write the bootstrap module.
+**Next action:** M3 3.8: open the bootstrap PR with the plan summary and merge it; then M4 (E4 apply from merged main).
 **Last updated:** 2026-10-06
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -228,6 +228,10 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-07 | M3 3.3c P4 | `policies/p4-boundary.json` + `aws_iam_policy.pipeline_boundary` (`/bootstrap/pipeline-boundary`), attached as the `pipeline-apply` permissions boundary; log bucket name `bootstrap-cloudtrail-186972156090` (<LOG_BUCKET>) in locals.tf. P1–P4 identical to ADR 0004 after substitution; P4 4,214 of 6,144 characters; fmt and validate OK. Pre-apply validate-policy and simulator runs declined (owner, 2026-10-07); the simulator checks stay in M6 |
 | 2026-10-07 | M3 3.4 budget alerts | `alerts.tf`: SNS `bootstrap-alerts` (topic policy: Budgets and `rule/bootstrap-*` publish only, option A), budget `bootstrap-monthly-cost` (USD 20, actual 50/75/90/100/125%, `include_credit = false`, email + topic), channel role `bootstrap-chatbot-channel` (no permissions), Q Developer channel `bootstrap-alerts` in us-east-2 with guardrail `AWSDenyAll` (option A; ADR 0006 updated), logging NONE. fmt and validate OK. If the Q Developer subscription fails at M4 because of the topic policy, add a statement then |
 | 2026-10-07 | M3 3.5 trail | `trail.tf`: log bucket `bootstrap-cloudtrail-186972156090` (versioning, SSE-S3, Block Public Access, prevent_destroy (option A; ADR 0007 (a) updated)), bucket policy (two CloudTrail statements limited by `aws:SourceArn`, deny object deletes to every principal), trail `bootstrap-trail` (multi-Region, log file validation, advanced selectors: all management events and state bucket object data events). fmt and validate OK |
+| 2026-10-07 | M3 3.6a event rules | `events.tf`: Seoul rules G1–G5 and `bootstrap-access-analyzer`, `bootstrap-forward` in us-east-1/us-east-2/us-west-2 (union of G1, G3, G4, G5; G4 as seven parts, no nested `$or`), role `/bootstrap/event-forwarder` (PutEvents to the Seoul default bus), all rules `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS`. fmt and validate OK. `aws events test-event-pattern` with hand-built CloudTrail-shaped events: 30 cases (match and no-match for every rule and the forwarder), 0 failed; real events are checked in M6 |
+| 2026-10-07 | M3 3.6b alert messages | `events.tf`: input transformers for the six Seoul rules to SNS `bootstrap-alerts` (Q Developer custom notifications; allowlisted fields per ADR 0007 (b): 9 for G1/G3/G4/G5, 5 for G2, 8 for Access Analyzer); raw-text templates because jsonencode() escapes `<` as `\u003c` (checked); run link as a plain URL. Local render with sample values: valid JSON, every placeholder defined and used, length limits met. `checks/test_event_patterns.py` kept in the repo for E7 re-runs (delete when no longer useful). Slack rendering is checked in M6 |
+| 2026-10-07 | M3 3.7 analyzer | `analyzer.tf`: `bootstrap-external-access`, type ACCOUNT, ap-northeast-2. Creating it adds `AWSServiceRoleForAccessAnalyzer` (record at M4). fmt and validate OK |
+| 2026-10-07 | M3 3.8 local plan | Owner ran `AWS_PROFILE=odyssey-admin terraform plan -out=bootstrap.tfplan` in `infra/bootstrap` (local state, empty): Plan: 44 to add, 0 to change, 0 to destroy, matching the 44 resources in the code. `terraform.tfvars` and the plan file are git-ignored. Next: PR with the plan summary (E7), merge, then M4 |
 
 ## 5. Verification
 
@@ -256,6 +260,7 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
   This is the ADR 0005 trigger for the Paid-plan transition.
 - (M3) The Amazon Q Developer API has no ap-northeast-2 endpoint; create the Slack channel configuration with
   `region = "us-east-2"` (AWS provider 6.x Region-aware resources; no provider alias). Seoul SNS topics are supported.
+- (M5) The apply workflow must request the role by its full ARN with the path (`arn:aws:iam::186972156090:role/bootstrap/pipeline-apply`): G2 matches `requestParameters.roleArn` exactly (inference: CloudTrail records the ARN as requested).
 
 ### Hand-offs from ADR 0004–0006
 - ~~D5: admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account (ADR 0004 (e)).~~ Done: ADR 0005.
