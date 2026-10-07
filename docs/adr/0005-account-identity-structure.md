@@ -72,8 +72,8 @@ Chosen: D.
 - Admin identity (E3): one IAM user with a console password and MFA. Policies: `AdministratorAccess` and
   `SignInLocalDevelopmentAccess`. No access keys.
 - CLI for E4, E5, and E7: `aws login` (AWS CLI >= 2.32.0). Temporary credentials, up to 12 hours.
-- Terraform `~> 1.15.0` (the S3 backend supports `aws login` only from 1.15.0 [T3]) and AWS provider `~> 6.23`
-  (`aws login` works from 6.23.0 [T4]); bounds per ADR 0004 (e) "Versions".
+- Terraform `~> 1.16.0` (the S3 backend supports `aws login` from 1.15.0 [T3]; 1.16 chosen 2026-10-07, ADR 0004 (e))
+  and AWS provider `~> 6.23` (`aws login` works from 6.23.0 [T4]); bounds per ADR 0004 (e) "Versions".
 - Do not use `source_profile` role chaining with `aws login` (#45817 [T6]).
 
 ### Trigger

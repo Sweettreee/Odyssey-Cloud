@@ -175,11 +175,14 @@ values, as in the first version of this ADR.
 ### (e) Repository, secrets, and account baseline
 - **Supply chain:** every action is pinned to a full-length commit SHA ("the only way to use an action
   as an immutable release" [G11]), enforced by the repository setting S9 [G8]. `.terraform.lock.hcl` is committed.
-- **Versions (added 2026-10-04):** both root modules set `required_version = "~> 1.15.0"` and the AWS provider
+- **Versions (added 2026-10-04):** both root modules set `required_version = "~> 1.16.0"` and the AWS provider
   `version = "~> 6.23"`; "Root modules should use a `~>` constraint to set both a lower and upper bound on versions
   for each provider they depend on" [T5]. The workflows install one exact Terraform version, and the laptop (E4,
   E5, E7) uses the same one. The lock file tracks providers only: "Terraform does not remember version selections
   for remote modules" [T4], so modules are local, or registry modules pinned to an exact `version`.
+  Changed from `~> 1.15.0` on 2026-10-07 at Step 4: 1.16 is the current minor (1.16.0, August 26, 2026); the S3
+  backend needs 1.15.0 or later for `aws login` [T3]; the 1.16 upgrade notes affect only provisioners, which this
+  project does not use. Laptop and CI use 1.16.5.
 - **Token defaults:** for personal-account repositories, `GITHUB_TOKEN` is read-only for contents and
   packages by default, and workflows are not allowed to create or approve pull requests by default [G8].
   Keep both defaults (S10, S11); verify in Step 5.
@@ -688,7 +691,7 @@ Workflow rules (checked in code review, not settings):
 |---|---|
 | Traffic | Only GitHub-hosted runners calling AWS STS; nothing inbound. |
 | Compute | GitHub-hosted runners; no server of my own. |
-| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform `~> 1.15.0`; ephemeral / write-only); personal identifiers are `sensitive` variables. PR comments carry a plan summary only; structural details are public. |
+| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform `~> 1.16.0`; ephemeral / write-only); personal identifiers are `sensitive` variables. PR comments carry a plan summary only; structural details are public. |
 | Security | Zero stored keys. Apply requires the `production` environment on `main` plus my approval; `main`-only is enforced by S3 and by the `ref` condition key, and the ordering rule closes the setup window. Fork PRs fail closed, and P1 admits only runs started by my account (`actor_id`). Bootstrap resources and escalation paths denied by P4. P4 keeps the pipeline in `ap-northeast-2` (global services excepted) and account-level S3 Block Public Access on (f). Actions pinned by SHA. External trust is detect-only (ADR 0007). GitHub account hardened by checklist. |
 | Cost | USD 0: Actions free for public repos [G13]; environments free for public repos [G4]; Access Analyzer external access free [A6] (ADR 0007). Secrets Manager: $0.40 per secret per month [A15]; 0 until a secret is stored. |
 | Observability | Actions run logs, environment approval history, CloudTrail role usage; alerts in ADR 0006 and ADR 0007. |

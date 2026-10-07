@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** E10: connect Slack to Amazon Q Developer (before E4).
+**Next action:** M3: write the bootstrap module.
 **Last updated:** 2026-10-06
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -219,6 +219,9 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-06 | CLI checks (E1, E2, E3) and aws login | AWS CLI 2.37.9 (official install script); `aws login` asked for the admin passkey. sts get-caller-identity = 186972156090 / user/odyssey-admin; get-account-summary: AccountMFAEnabled 1, AccountAccessKeysPresent 0; odyssey-admin: 0 access keys, 1 MFA device, 2 attached policies, no inline policies or groups. "Configure AWS skills and the AWS MCP server" prompt declined |
 | 2026-10-07 | Free plan service check | Owner: S3, CloudTrail, EventBridge, SNS, Budgets, Amazon Q Developer, IAM Access Analyzer listed on the AWS Free Tier page. Read-only calls all answered (0 resources each). The Amazon Q Developer API has no ap-northeast-2 endpoint; it is managed in us-east-2 (its console runs in us-east-2 only) |
 | 2026-10-07 | E6 check | odyssey-admin can open the Billing and Cost Management console (Free plan status shown) |
+| 2026-10-07 | E10 | Amazon Q Developer app installed through its console (us-east-2) as odyssey-admin; workspace `odyssey-cloud` State ENABLED; private alert channel created and @Amazon Q invited (channel ID kept for *.tfvars, not in the repo); 0 channel configurations (they are bootstrap code); AWSServiceRoleForAWSChatbot not created by E10 (NoSuchEntity) |
+| 2026-10-07 | Terraform | 1.16.5 installed from the official binary (SHA256 OK) to ~/.local/bin |
+| 2026-10-07 | M3 3.1 skeleton | `infra/bootstrap/`: versions.tf (`~> 1.16.0`, AWS `~> 6.23`), providers.tf (ap-northeast-2, allowed_account_ids, default_tags ManagedBy/Module), locals.tf (account ID), variables.tf (alert email, Slack IDs, sensitive). init -backend=false locked AWS provider 6.67.0; fmt and validate OK |
 
 ## 5. Verification
 
@@ -245,8 +248,8 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
   Fallback if the `ref` key does not match in Step 4: restore S15 (option A).
 - Free plan ends on 2027-04-06 or when the USD 100 credits run out, whichever comes first (Billing console, 2026-10-06).
   This is the ADR 0005 trigger for the Paid-plan transition.
-- (M3) The Amazon Q Developer API has no ap-northeast-2 endpoint; create the Slack channel configuration through a
-  us-east-2 provider alias. Seoul SNS topics are supported (Regions and quotas page).
+- (M3) The Amazon Q Developer API has no ap-northeast-2 endpoint; create the Slack channel configuration with
+  `region = "us-east-2"` (AWS provider 6.x Region-aware resources; no provider alias). Seoul SNS topics are supported.
 
 ### Hand-offs from ADR 0004–0006
 - ~~D5: admin identity type and MFA (EP-13); admin role trust has no service principal (EP-20); AWS human identity vs. the GitHub approval path (EP-24, solo-approval limit); AWS Organizations + RCP (EP-21); whether secrets move to a separate AWS account (ADR 0004 (e)).~~ Done: ADR 0005.
@@ -263,10 +266,10 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 - Fill `<OWNER_ID>`/`<REPO_ID>`/`<ACTOR_ID>`; verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing only those three claims (never the whole token); confirm `gh api` endpoints for E8 checks. Done 2026-10-06 (see §4); placeholders are filled when the trust policies are written.
 - E1 on the Free plan; right after E1, check that the services Phase 0 needs are available on the Free plan. Done 2026-10-07 (see §4).
 - E2/E3: root and the admin each register one synced passkey (iCloud Keychain). E6: root runs "Activate IAM Access" once. Done 2026-10-06/07 (see §4).
-- Pin Terraform `~> 1.15.0` (one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
+- Pin Terraform `~> 1.16.0` (1.16.5; one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
 - Verify that the admin's MFA is asked during `aws login`. Done 2026-10-06 (see §4).
 - P4 includes `iam:DeleteLoginProfile`; make sure a `bootstrap` apply does not remove `emergency-deny-all` (E9).
-- E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role (record it under E10 if so). Verify that budget and custom notifications render with an empty channel role and guardrail.
+- E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role (record it under E10 if so). Verify that budget and custom notifications render with an empty channel role and guardrail. E10 done 2026-10-07 (see §4); the service-linked role did not appear at E10, so recheck after the channel configuration is applied (M4). The render check stays open.
 - Confirm how the current Budgets API and AWS provider express `IncludeCredit`. Alert email and Slack workspace and channel IDs go in the ignored `*.tfvars` with `sensitive = true`; check that plans attached to PRs do not show them.
 - Exit criterion 3: a temporary USD 0.01 budget (credits counted, same five notifications and topic), added and removed through E7; every alert arrives in Slack and by email.
 - (D7) Alert render test: empty variables, " | " separators, the Slack link containing `<roleSessionName>` (fall back
