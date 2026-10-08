@@ -96,6 +96,11 @@ so keep the `bootstrap` module small and rarely changed.
 
 **Exit criteria interpretation**
 - Criterion 1: every resource, except those created by E1–E6 and E10, exists because of code.
+  Also excluded (added 2026-10-08, Step 5): defaults and side effects that AWS services create by themselves,
+  listed in the Phase 0 note: default VPCs, service-linked roles, the automatic Resource Explorer index and view,
+  and subscriptions that a service makes to our topics. Evidence for everything else: every management write
+  event since the account was created (CloudTrail Event history, all Regions) matches an exception, a merged
+  PR, or one of these AWS-created items.
 - Criterion 2: changes to the `main` module reach the cloud only through the pipeline;
   the `bootstrap` module follows E7.
 
