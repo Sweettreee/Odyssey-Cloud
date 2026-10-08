@@ -84,7 +84,7 @@ the trail is logging [EB3].
 | G2 `pipeline-apply` assumed | `bootstrap-g2-apply-assumed` | source `aws.sts`, `eventName` `AssumeRoleWithWebIdentity`, `requestParameters.roleArn` = the apply role ARN, no `errorCode` | Successful assumptions only. Because of (e), they happen only in `ap-northeast-2`, so G2 is not forwarded |
 | G3 IAM changes | `bootstrap-g3-iam` | source `aws.iam`, `readOnly` = false | Every IAM write, including roles, trust policies, users, access keys, login profiles, MFA, and identity providers |
 | G4 Logging and alert path changes | `bootstrap-g4-logging-path` | `readOnly` = false and any of: source `aws.cloudtrail`, `aws.chatbot`, or `aws.access-analyzer` (detail-type `AWS API Call via CloudTrail`); EventBridge calls on rules named `bootstrap-*`, `UpdateEventBus`, `PutPermission`, `RemovePermission`; SNS calls on topic or subscription ARNs matching `arn:aws:sns:*:<ACCOUNT_ID>:bootstrap-*`; S3 calls on `<LOG_BUCKET>` | Includes analyzer and archive-rule changes (c) |
-| G5 Budget changes | `bootstrap-g5-budget` | source `aws.budgets`, `readOnly` = false | Includes the temporary USD 0.01 test budget in Step 4 (expected alerts) |
+| G5 Budget changes | `bootstrap-g5-budget` | source `aws.budgets`, `readOnly` = false | Includes the temporary test budgets in Step 4 (expected alerts) |
 | Access Analyzer findings | `bootstrap-access-analyzer` | see (c) | |
 
 - Denied attempts are not filtered out of G1, G3, G4, and G5; their `errorCode` appears in the message.
