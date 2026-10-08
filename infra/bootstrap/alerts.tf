@@ -35,10 +35,23 @@ resource "aws_sns_topic_policy" "alerts" {
   })
 }
 
+locals {
+  budget_thresholds = [50, 75, 90, 100, 125]
+  # One budget per threshold: the Amazon Q Developer budget alert shows the budget name but not the
+  # threshold percent, so the name carries it (ADR 0006).
+  budgets = merge(
+    { for t in local.budget_thresholds : format("bootstrap-monthly-cost-%03dpct", t) => { limit = "20", threshold = t } },
+    # TEMPORARY (Step 4, exit criterion 3): a 0.0 limit puts each test budget in alarm; remove through E7
+    # after all five alerts arrive.
+    { for t in local.budget_thresholds : format("bootstrap-test-%03dpct", t) => { limit = "0.0", threshold = t } },
+  )
+}
+
 resource "aws_budgets_budget" "monthly" {
-  name         = "bootstrap-monthly-cost"
+  for_each     = local.budgets
+  name         = each.key
   budget_type  = "COST"
-  limit_amount = "20"
+  limit_amount = each.value.limit
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
@@ -47,16 +60,13 @@ resource "aws_budgets_budget" "monthly" {
     include_credit = false
   }
 
-  dynamic "notification" {
-    for_each = [50, 75, 90, 100, 125]
-    content {
-      comparison_operator        = "GREATER_THAN"
-      threshold                  = notification.value
-      threshold_type             = "PERCENTAGE"
-      notification_type          = "ACTUAL"
-      subscriber_email_addresses = [var.alert_email]
-      subscriber_sns_topic_arns  = [aws_sns_topic.alerts.arn]
-    }
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = each.value.threshold
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.alert_email]
+    subscriber_sns_topic_arns  = [aws_sns_topic.alerts.arn]
   }
 }
 
@@ -84,29 +94,4 @@ resource "aws_chatbot_slack_channel_configuration" "alerts" {
   sns_topic_arns        = [aws_sns_topic.alerts.arn]
   guardrail_policy_arns = ["arn:aws:iam::aws:policy/AWSDenyAll"]
   logging_level         = "NONE"
-}
-
-# TEMPORARY (Step 4, exit criterion 3): remove through E7 after all five alerts arrive (ADR 0006).
-resource "aws_budgets_budget" "test" {
-  name         = "bootstrap-test-alerts"
-  budget_type  = "COST"
-  limit_amount = "0.0001"
-  limit_unit   = "USD"
-  time_unit    = "MONTHLY"
-
-  cost_types {
-    include_credit = false
-  }
-
-  dynamic "notification" {
-    for_each = [50, 75, 90, 100, 125]
-    content {
-      comparison_operator        = "GREATER_THAN"
-      threshold                  = notification.value
-      threshold_type             = "PERCENTAGE"
-      notification_type          = "ACTUAL"
-      subscriber_email_addresses = [var.alert_email]
-      subscriber_sns_topic_arns  = [aws_sns_topic.alerts.arn]
-    }
-  }
 }

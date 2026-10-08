@@ -84,7 +84,7 @@ cases = [
   ("B", "DenyLogBucketConfig", X, APPLY, "s3:PutBucketPolicy", LOG, {}),
   ("B", "DenyLogObjects", X, APPLY, "s3:GetObject", LOG_OBJ, {}),
   ("B", "DenyLoggingAndAlertServices: CloudTrail", X, APPLY, "cloudtrail:StopLogging", f"arn:aws:cloudtrail:{SEOUL}:{ACCT}:trail/bootstrap-trail", {}),
-  ("B", "DenyLoggingAndAlertServices: budget", X, APPLY, "budgets:ModifyBudget", f"arn:aws:budgets::{ACCT}:budget/bootstrap-monthly-cost", {}),
+  ("B", "DenyLoggingAndAlertServices: budget", X, APPLY, "budgets:ModifyBudget", f"arn:aws:budgets::{ACCT}:budget/bootstrap-monthly-cost-050pct", {}),
   ("B", "DenyLoggingAndAlertServices: Slack channel", X, APPLY, "chatbot:DeleteSlackChannelConfiguration", "*", {}),
   ("B", "DenyLoggingAndAlertServices: analyzer", X, APPLY, "access-analyzer:DeleteAnalyzer", f"arn:aws:access-analyzer:{SEOUL}:{ACCT}:analyzer/bootstrap-external-access", {}),
   ("B", "DenyAlertRuleChanges", X, APPLY, "events:DisableRule", f"arn:aws:events:{SEOUL}:{ACCT}:rule/bootstrap-g2-apply-assumed", {}),

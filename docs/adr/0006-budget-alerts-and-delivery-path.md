@@ -77,11 +77,14 @@ Chosen: (a) B, (b) A, (c) A.
 ## Decision
 
 ### Budget
-- One AWS cost budget: monthly, recurring, USD 20.
+- Five AWS cost budgets, one per threshold, each monthly, recurring, USD 20 (`bootstrap-monthly-cost-050pct` …
+  `-125pct`; changed 2026-10-08): the Amazon Q Developer budget alert in Slack shows the budget name, alert
+  threshold, budgeted amount, and actual amount, but not the threshold percent (Step 4), so the name carries it.
+  Budgets without actions are free [BP1].
 - Credit-covered usage counts as cost (`IncludeCredit = false`) [B3]. Taxes stay included (default) [B3][TX1].
   Other cost types keep their defaults.
-- Actual-spend notifications at 50%, 75%, 90%, and 100% (USD 10, 15, 18, 20) and at 125% (USD 25, the ceiling):
-  the five-notification maximum [CF1]. No forecast notifications: not requested, and they need about five weeks of data [B4].
+- One actual-spend notification per budget, at 50%, 75%, 90%, and 100% (USD 10, 15, 18, 20) and at 125% (USD 25,
+  the ceiling). No forecast notifications: not requested, and they need about five weeks of data [B4].
 - Every notification goes to the SNS topic and to my email address [B4].
 - It lives in the `bootstrap` module, so it exists no later than E4 (ADR 0004 EP-22).
 
@@ -147,7 +150,7 @@ Chosen: (a) B, (b) A, (c) A.
 | To | Item |
 |---|---|
 | D7 | Add an EventBridge statement to the topic policy. Deny the pipeline any change to the budget, the SNS topic (policy and subscriptions), and the channel configuration (EP-22, extended). Alert on Budgets API changes such as `DeleteBudget` and `UpdateBudget` [EB1]. Security alerts use this topic as custom notifications [CN1] and need a trail with logging [EB2]. A topic in another Region, if global-service events need one, joins the same channel configuration [QS1]. |
-| Step 4 | Run E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role [QL1]; if so, record it under E10. Verify that budget and custom notifications render with an empty channel role and guardrail. Confirm how the current Budgets API and AWS provider express `IncludeCredit`. The alert email and the Slack workspace and channel IDs go in the ignored `*.tfvars` file, with variables declared `sensitive = true` (decided 2026-10-04, ADR 0004 (e)). Exit criterion 3: a temporary budget (credits counted, USD 0.0001, the same five notifications and topic) added and removed through E7; every alert must arrive in Slack and by email (changed 2026-10-08 from USD 0.01: actual spend was USD 0.001 after 8 days, so a USD 0.01 limit would raise no alert). Confirm Amazon Q Developer is available on the Free plan (existing check after E1). |
+| Step 4 | Run E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role [QL1]; if so, record it under E10. Verify that budget and custom notifications render with an empty channel role and guardrail. Confirm how the current Budgets API and AWS provider express `IncludeCredit`. The alert email and the Slack workspace and channel IDs go in the ignored `*.tfvars` file, with variables declared `sensitive = true` (decided 2026-10-04, ADR 0004 (e)). Exit criterion 3: temporary budgets (credits counted, USD 0.0, one per threshold, the same topic) added and removed through E7; every alert must arrive in Slack (changed 2026-10-08: actual spend was USD 0.001, so USD 0.01 would raise no alert; USD 0.0001 is stored as 0.0; one budget with five thresholds sent one Slack message for five alarms; email not checked, owner's decision). Confirm Amazon Q Developer is available on the Free plan (existing check after E1). |
 
 ## Revisit when
 - The Paid-plan transition happens (ADR 0005): recheck the budget once the account joins an organization.
@@ -188,3 +191,4 @@ Chosen: (a) B, (b) A, (c) A.
 - [SL5] Slack, Multi-Channel and Single-Channel Guests: https://slack.com/help/articles/202518103-Multi-Channel-and-Single-Channel-Guests
 - [SL7] Slack pricing (checked 2026-09-29): https://slack.com/pricing
 - [SK1] Slack, Using Socket Mode: https://docs.slack.dev/apis/events-api/using-socket-mode
+- [BP1] AWS Budgets pricing (checked 2026-10-08): https://aws.amazon.com/aws-cost-management/aws-budgets/pricing/
