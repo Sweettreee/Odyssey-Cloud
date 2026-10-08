@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** M5 (agreed 2026-10-08): 5.1 main skeleton (done) → 5.2 S9 (done) → 5.3 `plan.yml` (done) → 5.4 `apply.yml` (done) → 5.5 first PR plan, then S5–S8, S13–S14, check S10–S12 → 5.6 merge, approve, first apply (P3 Region, G2 within 15 minutes).
+**Next action:** M5 (agreed 2026-10-08): 5.1 main skeleton (done) → 5.2 S9 (done) → 5.3 `plan.yml` (done) → 5.4 `apply.yml` (done) → 5.5 first PR plan, then S5–S8, S13–S14, check S10–S12 (done) → 5.6 merge, approve, first apply (P3 Region, G2 within 15 minutes).
 **Last updated:** 2026-10-08
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -242,6 +242,9 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-08 | M5 5.3b plan auth | `plan.yml`: `id-token: write`; configure-aws-credentials v6.3.0 (SHA above) with role `arn:aws:iam::186972156090:role/bootstrap/pipeline-plan`, session name run ID, Region ap-northeast-2, audience default `sts.amazonaws.com`; `terraform init` (S3 backend, `main/terraform.tfstate`) + `plan` in `infra/main`. Other inputs left at defaults. YAML parses; expected first result "No changes" (5.5) |
 | 2026-10-08 | M5 5.3c plan summary | Option P-b: `Plan:`/`No changes.` line to the job summary (`$GITHUB_STEP_SUMMARY`), no `pull-requests: write`; `shell: bash` for pipefail; step fails if no summary line. ADR 0004 (e), workflow rules, and 6-Layer Data updated |
 | 2026-10-08 | M5 5.4 apply.yml | `.github/workflows/apply.yml`: `push` to `main` with no path filter (option F2: every merge asks for approval; F1 path filter not chosen), `environment: production`, `contents: read` + `id-token: write`, checkout v7.0.1 and configure-aws-credentials v6.3.0 (same SHAs as plan), Terraform 1.16.5 install same as plan, role `arn:aws:iam::186972156090:role/bootstrap/pipeline-apply` (full ARN with path for G2), session name run ID, ap-northeast-2, `terraform init` + `apply -auto-approve` in `infra/main` |
+| 2026-10-08 | M5 5.5 first PR plan | PR #10 (`feat/main-skeleton`, commit 7a4a577), run 37734692125: success; fork step skipped; both SHA-pinned actions ran with S9 on; configure-aws-credentials succeeded (P1 accepts `sub`, `ref`, `actor_id`: Step 4 check "first same-repo PR plan succeeds" done); job summary "No changes. Your infrastructure matches the configuration." (owner). No Slack alert, as designed (plan-role use is not alerted, ADR 0007 (b)) |
+| 2026-10-08 | M5 5.5 S10–S12 | GitHub REST GET: `actions/permissions/workflow` default_workflow_permissions read, can_approve_pull_request_reviews false (S10, S11); `actions/permissions/fork-pr-contributor-approval` approval_policy all_external_contributors (S12) |
+| 2026-10-08 | M5 5.5 S5–S8, S13–S14 | Owner created a classic branch protection rule for `main` (GitHub web UI). GitHub REST GET `branches/main/protection` (owner): required approvals 0, strict true, checks [plan], enforce_admins true, force pushes false, deletions false. Public `branches/main`: protected true, enforcement_level everyone |
 
 ## 5. Verification
 
