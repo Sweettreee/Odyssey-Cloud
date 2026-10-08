@@ -1,0 +1,60 @@
+name: plan
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    steps:
+      # Fail, not skip: a skipped job reports success (ADR 0004 (a)).
+      - name: Fail on pull requests from forks
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "Plan does not run on pull requests from forks (ADR 0004 (a))."
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Terraform
+        env:
+          TF_VERSION: 1.16.5
+          # linux_amd64 line of terraform_1.16.5_SHA256SUMS
+          TF_SHA256: 2bc2fcfff033265c9e02ca0351f01794eb122f62a9b2a49a3294b9e49eaab5e4
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/terraform.zip" "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+          echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/terraform.zip" terraform -d "$RUNNER_TEMP/bin"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Format check
+        run: terraform fmt -check -recursive infra
+
+      - name: Validate bootstrap
+        working-directory: infra/bootstrap
+        run: terraform init -backend=false -input=false && terraform validate
+
+      - name: Validate main
+        working-directory: infra/main
+        run: terraform init -backend=false -input=false && terraform validate
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::186972156090:role/bootstrap/pipeline-plan
+          role-session-name: ${{ github.run_id }}
+          aws-region: ap-northeast-2
+
+      # The job summary shows only the counts line; the full plan stays in the run log (ADR 0004 (e)).
+      - name: Plan main
+        working-directory: infra/main
+        shell: bash
+        run: |
+          terraform init -input=false
+          terraform plan -input=false -no-color | tee "$RUNNER_TEMP/plan.txt"
+          grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" >> "$GITHUB_STEP_SUMMARY"
