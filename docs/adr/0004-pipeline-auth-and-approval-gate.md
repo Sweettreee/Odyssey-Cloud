@@ -244,7 +244,7 @@ values, as in the first version of this ADR.
   [A20]. `s3:PutAccountPublicAccessBlock` is added to `DenyAccountLevelChanges`; it has no resource type, so only
   `Resource: "*"` matches it [A3].
 - Cost: USD 0. "There is no additional charge for IAM policies" [A19].
-- P4 size: about 4,210 of 6,144 characters (example values, whitespace removed; 424 more than ADR 0007 (d)) [A23].
+- P4 size: about 4,390 of 6,144 characters (example values, whitespace removed; 424 more than ADR 0007 (d); `DenyAccessPointCreation` added 2026-10-08) [A23].
 
 ## Exception E8 (amends ADR 0003)
 
@@ -538,6 +538,16 @@ Notes:
       "Resource": "arn:aws:s3:::<LOG_BUCKET>/*"
     },
     {
+      "Sid": "DenyAccessPointCreation",
+      "Effect": "Deny",
+      "Action": [
+        "s3:CreateAccessPoint",
+        "s3:CreateAccessPointForObjectLambda",
+        "s3:CreateMultiRegionAccessPoint"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "DenyLoggingAndAlertServices",
       "Effect": "Deny",
       "Action": ["cloudtrail:*", "budgets:*", "chatbot:*", "access-analyzer:*"],
@@ -726,7 +736,7 @@ Workflow rules (checked in code review, not settings):
 - A data-storing resource is added (by Phase 2 at the latest).
 - Phase 1 adds compute (add the `ec2:InstanceType` allowlist to P4), or the pipeline needs a global service or a
   us-east-1-only resource outside the `DenyOutsideSeoul` list (f).
-- P4 passes 80% of its 6,144-character limit (about 4,915 characters; about 4,210 now): restructure it before adding
+- P4 passes 80% of its 6,144-character limit (about 4,915 characters; about 4,390 now): restructure it before adding
   statements. At the Paid-plan transition (ADR 0005), consider moving account-wide Denies such as `DenyOutsideSeoul`
   into SCPs: an SCP restricts "IAM users and roles in member accounts, including the member account's root user" [A24],
   and holds up to 10,240 characters [A25].

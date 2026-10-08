@@ -176,11 +176,16 @@ P4 (ADR 0004) gains seven Deny statements. The full policy stays in ADR 0004, so
   [SR1], so the topic Deny also protects the subscriptions.
 - Log objects: the pipeline never needs the log files, and `s3:*` blocks reading, overwriting, and deleting them.
   CloudTrail omits `secretAccessKey` from STS responses [IT1], so the logged session token is not the reason.
+- Access points (added 2026-10-08, Step 4 simulator finding): a request through an access point names the access point
+  ARN (`arn:aws:s3:REGION:ACCOUNT:accesspoint/NAME/object/KEY`), which `DenyLogObjects` does not match, and P4 did not
+  deny creating one. `DenyAccessPointCreation` denies `s3:CreateAccessPoint`, `s3:CreateAccessPointForObjectLambda`,
+  and `s3:CreateMultiRegionAccessPoint` [SR1]; Phase 0 needs no access points. Deletes through an access point are
+  still denied by the bucket policy: "both the access point and the underlying bucket ... must permit the request" [S3AP].
 - The IAM user admin and root are out of scope, as in ADR 0003; G3 and G4 alert on their changes.
 - Size: P4 grows from 2,827 to about 3,786 characters (about 4,210 with ADR 0004 (f)) (example values, whitespace removed); the limit is 6,144 and
   "IAM doesn't count white space" [IQ1].
 - Step 4: the IAM policy simulator shows that each statement blocks its target and that normal `main` actions (for
-  example creating EC2 and S3 resources) stay allowed; access to the log bucket through an S3 access point is denied.
+  example creating EC2 and S3 resources) stay allowed; creating an S3 access point is denied, so the log bucket cannot be reached through one.
 
 ### (e) Region of the apply-role assumption (P3)
 - Calls to a Regional STS endpoint are logged in that Region, and calls to the global endpoint in us-east-1; STS is
@@ -281,6 +286,7 @@ P4 (ADR 0004) gains seven Deny statements. The full policy stays in ADR 0004, so
 - [IA2] IAM, Resource: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_resource.html
 - [SR1] AWS service reference (events, sns, chatbot, iam; checked 2026-10-01): https://servicereference.us-east-1.amazonaws.com/v1/events/events.json
 - [IQ1] IAM and AWS STS quotas (checked 2026-10-01): https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
+- [S3AP] S3, Configuring IAM policies for using access points (checked 2026-10-08): https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points-policies.html
 - [ST1] IAM, AWS STS Regions and endpoints: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_region-endpoints.html
 - [ST2] IAM, Manage AWS STS in an AWS Region: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html
 - [CK1] IAM, AWS global condition context keys (`aws:RequestedRegion`): https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-requestedregion
