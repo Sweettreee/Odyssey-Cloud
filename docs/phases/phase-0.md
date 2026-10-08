@@ -5,8 +5,8 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** M4 E5: add the S3 backend (PR, E7), then `terraform init -migrate-state` from merged main.
-**Last updated:** 2026-10-06
+**Next action:** M5 (agreed 2026-10-08): 5.1 main skeleton (done) → 5.2 S9 (owner, E8) → 5.3 `plan.yml` → 5.4 `apply.yml` → 5.5 first PR plan, then S5–S8, S13–S14, check S10–S12 → 5.6 merge, approve, first apply (P3 Region, G2 within 15 minutes).
+**Last updated:** 2026-10-08
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
 
@@ -234,6 +234,8 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-07 | M3 3.8 local plan | Owner ran `AWS_PROFILE=odyssey-admin terraform plan -out=bootstrap.tfplan` in `infra/bootstrap` (local state, empty): Plan: 44 to add, 0 to change, 0 to destroy, matching the 44 resources in the code. `terraform.tfvars` and the plan file are git-ignored. Next: PR with the plan summary (E7), merge, then M4 |
 | 2026-10-07 | M3 PR | Bootstrap code merged to `main` through a PR with the plan summary (E7 procedure) |
 | 2026-10-07 | M4 E4 apply | Owner applied from merged `main` with local state: 44 added. Checks (read-only): `terraform plan` No changes (E4 check); trail IsLogging true, no delivery error; pipeline-apply boundary = pipeline-boundary; SNS subscription https://global.sns-api.chatbot.amazonaws.com (topic policy option A works); Q Developer channel ENABLED with AWSDenyAll; 6 Seoul rules and 3 forwarders in state ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS; Access Analyzer active findings only for pipeline-plan and pipeline-apply (expected). Service-linked roles created by AWS outside code: AWSServiceRoleForAccessAnalyzer and AWSServiceRoleForAWSChatbot (the latter appeared with the channel configuration, not at E10) |
+| 2026-10-07 | M4 E5 migrate state | Backend block (S3, `bootstrap/terraform.tfstate`, `use_lockfile = true`) merged in PR #9; owner ran `terraform init -migrate-state` on `main`. Checks: object `bootstrap/terraform.tfstate` in the state bucket, versioning Enabled, plan No changes through the S3 backend; local `terraform.tfstate` and `.backup` deleted by the owner (none remain). ADR 0003 "confirm use_lockfile support" done: the S3 backend docs describe `use_lockfile` and call DynamoDB locking deprecated |
+| 2026-10-08 | M5 5.1 main skeleton | `infra/main/`: versions.tf (`~> 1.16.0`, AWS `~> 6.23`, S3 backend key `main/terraform.tfstate` with `use_lockfile`, the only key P2 and P4 allow), providers.tf (ap-northeast-2, account ID as a literal (option A), default_tags Module `main`); no resources or variables. init -backend=false locked AWS provider 6.68.0 (bootstrap: 6.67.0); fmt and validate OK. Branch `feat/main-skeleton` |
 
 ## 5. Verification
 
