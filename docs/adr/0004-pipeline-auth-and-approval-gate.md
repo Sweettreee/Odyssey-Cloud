@@ -192,8 +192,9 @@ values, as in the first version of this ADR.
   while ephemeral values (1.10+) and write-only arguments (1.11+) are omitted [T2]. Reason: the plan
   role must read main state, so any secret stored in state is reachable by PR code.
 - **Public plan output (layered):** secrets never enter Terraform (above); remaining sensitive values are
-  marked `sensitive`; PR comments show only a plan summary (add/change/destroy counts), never the full
-  plan. The full plan stays in the run log linked from the PR. Structural details remain public while
+  marked `sensitive`; the job summary shows only a plan summary (the `Plan:` or `No changes.` line), never
+  the full plan [G23] (changed 2026-10-08 from a PR comment, option P-b: no PR write permission). The full
+  plan stays in the run log linked from the PR. Structural details remain public while
   the repo is public; AWS account IDs "are not considered secret, sensitive, or confidential information" [A12].
   - Personal identifiers (added 2026-10-04): the alert email and the Slack workspace and channel IDs live in the
     ignored `*.tfvars` file, and their variables are declared `sensitive = true`. Terraform "redacts sensitive
@@ -670,12 +671,22 @@ Notes on P4:
 
 Workflow rules (checked in code review, not settings):
 - Plan workflow: trigger `pull_request` only; the job fails for fork PRs (see (a));
-  `permissions: { contents: read, id-token: write, pull-requests: write }` (`pull-requests: write` only to post the plan summary).
+  `permissions: { contents: read, id-token: write }` (no `pull-requests: write`: the plan summary goes to the job summary, changed 2026-10-08).
 - Plan workflow, before AWS authentication: `terraform fmt -check -recursive`, then
   `terraform init -backend=false` and `terraform validate` in both `bootstrap` and `main`.
   Any failure fails the plan job (S13). These steps need no AWS credentials.
 - Apply workflow: trigger `push` to `main`; job `environment: production`; `permissions: { contents: read, id-token: write }`.
 - No `pull_request_target` anywhere. Every action pinned to a full-length commit SHA.
+- Each `uses:` line carries its version as a comment (for example `# v6.0.0`). Before merging a PR that adds or
+  changes a SHA, I compare it with the official tag:
+  `git ls-remote --tags https://github.com/OWNER/REPO 'refs/tags/vX.Y.Z*'`; for an annotated tag, the `^{}` line
+  "shows the name of the object the tag points at" [G22]. Reason: S9 checks only that a full SHA is used, and
+  "Commits pushed to any repository in a network can be accessible from other repositories in that network" [G21]
+  (inference: a fork's commit may run through `uses: OWNER/REPO@SHA`). SHAs come from command output, never from
+  memory. Added 2026-10-08 (option A; option B, a SHA allowlist in Actions settings, not chosen).
+- Terraform is installed by a `run:` step from releases.hashicorp.com (`terraform_1.16.5_linux_amd64.zip`, checked
+  against the SHA256 from `terraform_1.16.5_SHA256SUMS`, written in the workflow) [T6], not by a setup action. The only third-party actions are
+  `actions/checkout` and `aws-actions/configure-aws-credentials`. Added 2026-10-08 (option C).
 - AWS authentication uses `aws-actions/configure-aws-credentials`, pinned to a full-length commit SHA;
   its audience `sts.amazonaws.com` matches P1 and P3 [G2].
 - The apply and plan jobs set `role-session-name: ${{ github.run_id }}` (ADR 0007 (b)) and `aws-region: ap-northeast-2` (ADR 0007 (e)).
@@ -695,7 +706,7 @@ Workflow rules (checked in code review, not settings):
 |---|---|
 | Traffic | Only GitHub-hosted runners calling AWS STS; nothing inbound. |
 | Compute | GitHub-hosted runners; no server of my own. |
-| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform `~> 1.16.0`; ephemeral / write-only); personal identifiers are `sensitive` variables. PR comments carry a plan summary only; structural details are public. |
+| Data | State stays in S3. Plan role reads only main state and its lock among S3 objects, and no DynamoDB items. Apply role cannot touch bootstrap state. Secrets never enter state (Terraform `~> 1.16.0`; ephemeral / write-only); personal identifiers are `sensitive` variables. The job summary carries a plan summary only; structural details are public. |
 | Security | Zero stored keys. Apply requires the `production` environment on `main` plus my approval; `main`-only is enforced by S3 and by the `ref` condition key, and the ordering rule closes the setup window. Fork PRs fail closed, and P1 admits only runs started by my account (`actor_id`). Bootstrap resources and escalation paths denied by P4. P4 keeps the pipeline in `ap-northeast-2` (global services excepted) and account-level S3 Block Public Access on (f). Actions pinned by SHA. External trust is detect-only (ADR 0007). GitHub account hardened by checklist. |
 | Cost | USD 0: Actions free for public repos [G13]; environments free for public repos [G4]; Access Analyzer external access free [A6] (ADR 0007). Secrets Manager: $0.40 per secret per month [A15]; 0 until a secret is stored. |
 | Observability | Actions run logs, environment approval history, CloudTrail role usage; alerts in ADR 0006 and ADR 0007. |
@@ -756,6 +767,9 @@ Workflow rules (checked in code review, not settings):
 - [G18] GitHub CLI manual, `gh auth login`: https://cli.github.com/manual/gh_auth_login
 - [G19] REST API, OIDC subject customization: https://docs.github.com/en/rest/actions/oidc ; fine-grained permission data: https://github.com/github/docs/blob/main/src/github-apps/data/fpt-2022-11-28/fine-grained-pat-permissions.json
 - [G20] GitHub contexts reference (`github.actor`, `github.triggering_actor`): https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
+- [G21] Forks, "Permissions of forks": https://docs.github.com/en/pull-requests/reference/forks
+- [G22] Git reference, git-ls-remote (OUTPUT): https://git-scm.com/docs/git-ls-remote
+- [G23] Workflow commands, "Adding a job summary": https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands
 - [A2] IAM permissions boundaries: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html
 - [A3] AWS service reference for IAM: https://servicereference.us-east-1.amazonaws.com/v1/iam/iam.json
 - [A4] IAM condition operators: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html
@@ -785,4 +799,5 @@ Workflow rules (checked in code review, not settings):
 - [T3] Terraform CHANGELOG, 1.15.0 (April 29, 2026), "backend/s3: Support authentication via `aws login`": https://github.com/hashicorp/terraform/blob/v1.15/CHANGELOG.md
 - [T4] Terraform dependency lock file: https://developer.hashicorp.com/terraform/language/files/dependency-lock
 - [T5] Terraform version constraints: https://developer.hashicorp.com/terraform/language/expressions/version-constraints
+- [T6] Terraform 1.16.5 release files: https://releases.hashicorp.com/terraform/1.16.5/
 - [W1] Woowahan tech blog, "사례별로 알아본 안전한 S3 사용 가이드" (2021-11-09), section 0x03-1: https://techblog.woowahan.com/6217/
