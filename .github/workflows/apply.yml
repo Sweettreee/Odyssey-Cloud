@@ -33,8 +33,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::186972156090:role/bootstrap/pipeline-apply
           role-session-name: ${{ github.run_id }}
-          # TEMPORARY (R1 test): expect AccessDenied; revert to ap-northeast-2 in the next PR.
-          aws-region: us-east-1
+          aws-region: ap-northeast-2
 
       - name: Apply main
         working-directory: infra/main
