@@ -85,3 +85,28 @@ resource "aws_chatbot_slack_channel_configuration" "alerts" {
   guardrail_policy_arns = ["arn:aws:iam::aws:policy/AWSDenyAll"]
   logging_level         = "NONE"
 }
+
+# TEMPORARY (Step 4, exit criterion 3): remove through E7 after all five alerts arrive (ADR 0006).
+resource "aws_budgets_budget" "test" {
+  name         = "bootstrap-test-alerts"
+  budget_type  = "COST"
+  limit_amount = "0.0001"
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  cost_types {
+    include_credit = false
+  }
+
+  dynamic "notification" {
+    for_each = [50, 75, 90, 100, 125]
+    content {
+      comparison_operator        = "GREATER_THAN"
+      threshold                  = notification.value
+      threshold_type             = "PERCENTAGE"
+      notification_type          = "ACTUAL"
+      subscriber_email_addresses = [var.alert_email]
+      subscriber_sns_topic_arns  = [aws_sns_topic.alerts.arn]
+    }
+  }
+}
