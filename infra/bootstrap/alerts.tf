@@ -41,9 +41,9 @@ locals {
   # threshold percent, so the name carries it (ADR 0006).
   budgets = merge(
     { for t in local.budget_thresholds : format("bootstrap-monthly-cost-%03dpct", t) => { limit = "20", threshold = t } },
-    # TEMPORARY (Step 4, exit criterion 3): a 0.0 limit puts each test budget in alarm; remove through E7
-    # after all five alerts arrive.
-    { for t in local.budget_thresholds : format("bootstrap-test-%03dpct", t) => { limit = "0.0", threshold = t } },
+    # TEMPORARY (Step 4, exit criterion 3): a 0.0001 limit (stored as 0.0; the API rejects 0) puts each test
+    # budget in alarm; remove through E7 after all five alerts arrive.
+    { for t in local.budget_thresholds : format("bootstrap-test-%03dpct", t) => { limit = "0.0001", threshold = t } },
   )
 }
 
