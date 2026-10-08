@@ -175,6 +175,16 @@
       "Resource": "arn:aws:s3:::${log_bucket}/*"
     },
     {
+      "Sid": "DenyAccessPointCreation",
+      "Effect": "Deny",
+      "Action": [
+        "s3:CreateAccessPoint",
+        "s3:CreateAccessPointForObjectLambda",
+        "s3:CreateMultiRegionAccessPoint"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "DenyLoggingAndAlertServices",
       "Effect": "Deny",
       "Action": ["cloudtrail:*", "budgets:*", "chatbot:*", "access-analyzer:*"],
