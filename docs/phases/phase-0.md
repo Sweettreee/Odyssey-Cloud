@@ -4,11 +4,11 @@
 > Update at the end of each learning topic, decision, and implementation step. Keep it short; this is not a transcript.
 
 **Phase status:** In progress
-**Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** M5 and M6 done 2026-10-08 (PR #10–#17, see §4; §6 Step 4 checklist done except the ongoing `gh` login hygiene). Next: merge the runbook and logs, then Step 5 Verification after the owner confirms.
+**Current step:** 5 Verification (started 2026-10-08 after the owner confirmed; Step 4 closed with M0–M6, PR #10–#18)
+**Next action:** Step 5 passed on 2026-10-08 (criterion 1 with the email contact carried over, option C2). Phase 0 stays open: do not close it (Step 6) until the owner says so.
 **Last updated:** 2026-10-08
 
-> **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
+> **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007). Step 4 closed on 2026-10-08 (M0–M6, PR #10–#18). Step 5 in progress since 2026-10-08; see Next action and §5.
 
 ## Carry-over from previous phase
 - None (first Phase).
@@ -28,11 +28,11 @@ Status: Final (agreed on 2026-09-17). Added topics 7–8 and one "before moving 
 - [x] The bootstrap problem: what must exist by hand before IaC can run, and why those exceptions are recorded in an ADR.
 
 ### Before moving on (I can explain…)
-- [ ] Why the root account should not be used day to day.
-- [ ] What happens between opening a pull request and the change reaching real infrastructure.
-- [ ] Why state is stored remotely.
-- [ ] The account's trust boundaries, drawn on a blank page.
-- [ ] Which actions are bootstrap exceptions and how they are controlled.
+- [x] Why the root account should not be used day to day. Owner explained (2026-10-08); added: root has complete access including account and billing changes, no SCP for a standalone account, E9 cannot stop root, G1 alerts on use.
+- [x] What happens between opening a pull request and the change reaching real infrastructure. Owner explained (2026-10-08); corrected: the PR plan uses the plan role, not `production`; the apply workflow waits for the `production` approval and the pipeline runs `terraform apply` for `main` (only `bootstrap` is applied by hand, E7).
+- [x] Why state is stored remotely. Model answer by Claude at the owner's request (2026-10-08): one shared state for laptop and pipeline, locking, versioning, sensitive values kept out of git and access-limited.
+- [x] The account's trust boundaries, drawn on a blank page. Drawn by the owner on 2026-10-05 (§4); model answer table by Claude at the owner's request (2026-10-08).
+- [x] Which actions are bootstrap exceptions and how they are controlled. Model answer by Claude at the owner's request (2026-10-08): E1–E10, ADR 0003 control rules, G1/G3–G5 alerts, apply-to-PR matching.
 
 ## 2. Learning notes
 
@@ -262,11 +262,37 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 ## 5. Verification
 
 ### Exit criteria
-- [ ] Every resource exists because of code.
-- [ ] Infrastructure changes reach the cloud only through the pipeline.
-- [ ] Test alerts for every AWS budget threshold reach Slack.
+- [x] Every resource exists because of code. Evidence below. Passed on 2026-10-08 with one item carried over to Phase 1: the email contact (option C2, owner).
+- [x] Infrastructure changes reach the cloud only through the pipeline. Evidence below.
+- [x] Test alerts for every AWS budget threshold reach Slack. Evidence: §4 M6 6.4 (one alert per test budget, percent in the name).
 
-Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions E1–E6 and E10; criterion 2 applies to the `main` module, while `bootstrap` follows E7.
+Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions E1–E6 and E10 and AWS-created defaults and side effects; criterion 2 applies to the `main` module, while `bootstrap` follows E7.
+
+### Exception checks (ADR 0003 control rule 2, 2026-10-08)
+| Exception | Check and result |
+|---|---|
+| E1 | `sts get-caller-identity`: 186972156090 |
+| E2, E6 | `get-account-summary`: AccountMFAEnabled 1, AccountAccessKeysPresent 0. Billing console opens as admin (owner) |
+| E3 | odyssey-admin: login profile present, 1 MFA device, 0 access keys, AdministratorAccess and SignInLocalDevelopmentAccess |
+| E4, E7 | `bootstrap` plan: no changes. Admin write events (CloudTrail Event history, us-east-1 and Seoul, since 2026-10-07): E4 (10-07 20:44–20:45 KST) and the applies of PR #13, #14, #15, #16, #17 (10-08 19:47, 19:59, 20:32, 20:36, 20:46 KST); 10-07 10:17 = admin `CheckMfa` + `ConsoleLogin`; 10-08 20:07 and 20:15 = `SendActivationCode` (AWS User Notifications email contact, owner's console action) |
+| E5 | State bucket versioning Enabled; no local `*.tfstate*` in `infra/bootstrap` or `infra/main` |
+| E8 | GitHub REST GET: environment `production` (S1–S4), branch policy `main`, branch protection (S5–S8, S13–S14), S9, S10, S11, S12: all as in ADR 0004 (owner) |
+| E9 | `pipeline-apply` has no inline policy; `pipeline-boundary` default version v2 (PR #13) |
+| E10 | `chatbot describe-slack-workspaces` (us-east-2): ENABLED |
+
+### Exit criteria evidence (2026-10-08)
+- Criterion 1: management write events since 2026-10-06 in every Region (CloudTrail Event history, `ReadOnly=false`)
+  match E1–E3, E6 (root and admin on 10-06), E10 (us-east-2 10-07), E4 (10-07 20:44–20:45 KST), or the E7 applies of
+  PR #13–#17; the pipeline roles made no management writes. AWS-created items (excluded, ADR 0003): default VPCs
+  (`AutomatedDefaultVpcCreation` by `ec2.amazonaws.com`, us-east-1 and Seoul), `AWSServiceRoleForResourceExplorer`
+  with its index and default view (created by `resource-explorer-2.amazonaws.com` during the root sign-up session),
+  `AWSServiceRoleForAccessAnalyzer`, `AWSServiceRoleForAWSChatbot`, and the Q Developer subscription to
+  `bootstrap-alerts`. The Q Developer channel configuration is recorded in us-west-2 but was created by the E4 apply
+  (Terraform user agent). Admin sign-ins: 10-06 and 10-07 (E3, E10 work) and 10-08 05:09 UTC in ap-southeast-2
+  (owner's network and passkey; the sign-in started from a console page in that Region). The email contact is carried over to Phase 1 (§7, option C2).
+- Criterion 2: `main` has no resources yet; every `main` apply ran in the apply workflow (runs 37737103122,
+  37761298407, and the denied 37760564605); every access to `main/terraform.tfstate` was by the pipeline roles
+  (§4 M6 6.2).
 
 ## 6. Open issues
 - ~~Bootstrap exceptions must be recorded in an ADR.~~ Resolved: ADR 0003 (E1–E7).
@@ -286,6 +312,7 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
   This is the ADR 0005 trigger for the Paid-plan transition.
 - (M3) The Amazon Q Developer API has no ap-northeast-2 endpoint; create the Slack channel configuration with
   `region = "us-east-2"` (AWS provider 6.x Region-aware resources; no provider alias). Seoul SNS topics are supported.
+- ~~(Step 5, deferred by the owner 2026-10-08) An AWS User Notifications email contact exists outside code:~~ Carried over to Phase 1 (§7, option C2). Details: `inactive`, created 2026-10-07 11:45:02 UTC (the E4 apply minute; creator not confirmed; inference: created by AWS Budgets for the email subscriber). The email was never verified, so budget emails did not arrive. The owner will handle it later; it affects exit criterion 1.
 - (M5) The apply workflow must request the role by its full ARN with the path (`arn:aws:iam::186972156090:role/bootstrap/pipeline-apply`): G2 matches `requestParameters.roleArn` exactly (inference: CloudTrail records the ARN as requested).
 
 ### Hand-offs from ADR 0004–0006
@@ -326,6 +353,8 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 
 ## 7. Carry-over to next phase
 - (Phase 1) Add an `ec2:InstanceType` allowlist to P4 when compute arrives (ADR 0004 (f)).
+- (Phase 1) Decide whether to keep the AWS-created default VPCs or remove them through code (Step 5, criterion 1).
+- (Phase 1) Handle the AWS User Notifications email contact created outside code at the E4 apply (`inactive`, never verified; inference: created by AWS Budgets for the email subscriber): delete it, bring it into code, or verify it and record it (Step 5, criterion 1, option C2). The owner decides when.
 - (Phase 1) Decide whether containers on a host follow problem 1 (code, approval, pipeline) or count as operations (design principles review).
 - (Phase 2) Application CI/CD: compare a new GitHub OIDC role with deploys through the apply pipeline (ADR 0004 "Revisit when").
 - (Phase 4) Decide how to review CloudTrail logs older than the 90-day Event history.
