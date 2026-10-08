@@ -5,7 +5,7 @@
 
 **Phase status:** In progress
 **Current step:** 4 Implementation (Step 3 closed by the owner on 2026-10-04: D1–D7 decided, ADR 0001–0007; two reviews applied)
-**Next action:** M5 done 2026-10-08 (PR #10–#12, see §4). Next: M6 Step 4 checks (§6 checklist; order to be agreed), then Step 5.
+**Next action:** M5 and M6 done 2026-10-08 (PR #10–#17, see §4; §6 Step 4 checklist done except the ongoing `gh` login hygiene). Next: merge the runbook and logs, then Step 5 Verification after the owner confirms.
 **Last updated:** 2026-10-08
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007, Accepted). Step 4 in progress since 2026-10-05; see Next action, the §4 log, and the §6 checklist.
@@ -255,6 +255,9 @@ Review of the vision and ADR 0001–0007 against scalability, availability, late
 | 2026-10-08 | M6 6.4 test budget added (E7) | `bootstrap-monthly-cost` ActualSpend was USD 0.001, so a USD 0.01 test budget would raise no alert: option T1, `bootstrap-test-alerts` at USD 0.0001 (ADR 0006 updated). PR #14 with the owner's local plan (1 to add), merged, applied from `main`. Post-apply plan: `~ limit_amount = "0.0" -> "0.0001"` (Budgets stored 0.0; inference: limited precision); option L1: drift accepted until the removal E7. Slack: G5 for `CreateBudget` and five `CreateNotification` render correctly (G5 render check done); first budget alert shows Budget name, Alert threshold, Budgeted amount, Actual amount (two decimals, so the test shows $0.00; percent = threshold / budgeted); console shows the thresholds exceeded. Waiting: all five budget alerts in Slack and by email |
 | 2026-10-08 | M6 6.4 one budget per threshold (E7) | All five notifications of `bootstrap-test-alerts` were ALARM, but SNS `bootstrap-alerts` published and delivered 8 messages in the hour (6 G5 + 1 budget alert + 1 other), so one budget with five thresholds sent one Slack message; the Slack alert also does not show the percent. Option A: one budget per threshold, name carries the percent (`bootstrap-monthly-cost-050pct` … `-125pct`, USD 20) plus temporary `bootstrap-test-050pct` … `-125pct`; ADR 0006 updated; email check skipped (owner). PR #15 (plan 10 add, 2 destroy), merged; apply created the five real budgets and destroyed the two old ones, but the five test budgets failed: "budget limit must be larger than 0" (limit 0.0). Follow-up: test limit 0.0001 (stored as 0.0; L1 drift accepted until removal); `main` plan before the fix: 5 to add |
 | 2026-10-08 | M6 6.4 test budgets (E7) and G1 | PR #16 (limit 0.0001), merged; apply "5 added"; post-apply plan 5 to change (`limit_amount "0.0" -> "0.0001"`, L1). Slack: one AWS Budgets alert per test budget, Budget name shows the percent (`bootstrap-test-075pct`, `-090pct` at 20:37 KST, then the rest; owner checked all five): exit criterion 3 evidence. G5 for the five `CreateBudget` and `CreateNotification` events. G1: owner signed in as root once and checked the G1 alert (G1 render check done; all G groups and Access Analyzer now rendered). Next: remove the test budgets (E7) |
+| 2026-10-08 | M6 6.4 test budgets removed (E7) | Branch `chore/remove-test-budgets` (plan 5 to destroy), merged; apply "0 added, 0 changed, 5 destroyed"; post-apply plan "No changes" (L1 drift gone); five G5 `DeleteBudget` alerts in Slack. Five real budgets remain (`bootstrap-monthly-cost-050pct` … `-125pct`, USD 20). 6.4 done |
+| 2026-10-08 | M6 6.5 runbook | `docs/runbooks/root-activity.md`: trigger, "was it me" checks, response order (root email first, root password and MFA, root events in four Regions, undo, E9 if the pipeline is involved, contact AWS, incident PR), G2 health check commands, and E9 rules (no `bootstrap` apply while E9 is in place; Terraform does not remove the out-of-band `emergency-deny-all`, inference from provider docs). Root event filter tested on a sample event |
+| 2026-10-08 | M6 6.6 log cost | Prices (checked 2026-10-08): CloudTrail first management copy free, data events USD 0.10 per 100,000 (CloudTrail pricing); S3 Standard Seoul USD 0.025 per GB-month, PUT/LIST USD 0.0045 per 1,000 (AWS Price List API, published 2026-09-28). Measured: log bucket 590 objects, 978,332 bytes since E4 (about 1.5 days); state bucket 2 objects, 102,562 bytes; about 56 data events on a busy day. Estimate (inference): about 12,000 log file PUTs a month (USD 0.05), storage growing about 20 MB a month (under USD 0.001), data events under USD 0.002: about USD 0.06 a month, far under the USD 20 target |
 
 ## 5. Verification
 
@@ -300,26 +303,26 @@ Interpretation (ADR 0003): criterion 1 excludes resources created by exceptions 
 - Fill `<OWNER_ID>`/`<REPO_ID>`/`<ACTOR_ID>`; verify the exact `sub`, `ref`, and `actor_id` values from a real token, printing only those three claims (never the whole token); confirm `gh api` endpoints for E8 checks. Done 2026-10-06 (see §4); placeholders are filled when the trust policies are written.
 - E1 on the Free plan; right after E1, check that the services Phase 0 needs are available on the Free plan. Done 2026-10-07 (see §4).
 - E2/E3: root and the admin each register one synced passkey (iCloud Keychain). E6: root runs "Activate IAM Access" once. Done 2026-10-06/07 (see §4).
-- Pin Terraform `~> 1.16.0` (1.16.5; one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`.
+- Pin Terraform `~> 1.16.0` (1.16.5; one exact version in CI and on the laptop), AWS provider `~> 6.23`, AWS CLI `>= 2.32.0`; modules local or exact; no `source_profile` role chaining with `aws login`. Done (M3 versions.tf, 5.3 workflows: Terraform 1.16.5 in CI and on the laptop).
 - Verify that the admin's MFA is asked during `aws login`. Done 2026-10-06 (see §4).
-- P4 includes `iam:DeleteLoginProfile`; make sure a `bootstrap` apply does not remove `emergency-deny-all` (E9).
+- P4 includes `iam:DeleteLoginProfile`; make sure a `bootstrap` apply does not remove `emergency-deny-all` (E9). Done 2026-10-08: runbook §5 (inference from provider docs; not tested live).
 - E10 before E4. Check whether E10 creates the `AWSServiceRoleForAWSChatbot` service-linked role (record it under E10 if so). Verify that budget and custom notifications render with an empty channel role and guardrail. E10 done 2026-10-07 (see §4); the service-linked role did not appear at E10, so recheck after the channel configuration is applied (M4). The render check stays open.
 - Confirm how the current Budgets API and AWS provider express `IncludeCredit`. Alert email and Slack workspace and channel IDs go in the ignored `*.tfvars` with `sensitive = true`; check that plans attached to PRs do not show them. IncludeCredit done 2026-10-07: API default `true`; provider `cost_types { include_credit = false }` counts credit-covered usage (see §4).
-- Exit criterion 3: a temporary USD 0.01 budget (credits counted, same five notifications and topic), added and removed through E7; every alert arrives in Slack and by email.
+- Exit criterion 3: a temporary USD 0.01 budget (credits counted, same five notifications and topic), added and removed through E7; every alert arrives in Slack and by email. Done 2026-10-08 with one USD 0.0001 test budget per threshold (Slack only, email skipped by the owner; see §4 6.4).
 - (D7) Alert render test: empty variables, " | " separators, the Slack link containing `<roleSessionName>` (fall back
-  to a plain URL if the nested angle brackets conflict), and whether `\n` in the description renders as a line break.
+  to a plain URL if the nested angle brackets conflict), and whether `\n` in the description renders as a line break. Done 2026-10-08 for G1–G5 and Access Analyzer (see §4 6.1, 6.3 fix, 6.4).
 - (D7) On the first real G2 event, check that `awsRegion` is `ap-northeast-2` and
   `additionalEventData.RequestDetails.endpointType` is `regional`; root `ConsoleLogin` is recorded in us-east-1,
   us-east-2, or us-west-2. A working Seoul apply shows that P3 evaluates `aws:RequestedRegion`; prove once that an
-  assumption through another Region is denied. If the condition blocks the Seoul apply, switch to option B.
+  assumption through another Region is denied. If the condition blocks the Seoul apply, switch to option B. Done 2026-10-08 (see §4 5.6 and R1; root sign-in reached Slack as G1).
 - (D7) IAM policy simulator: each D7-d Deny blocks its target, and normal `main` actions (for example creating EC2 and S3
-  resources) stay allowed. Also try the log bucket through an S3 access point (expected: denied).
+  resources) stay allowed. Also try the log bucket through an S3 access point (expected: denied). Done 2026-10-08: the access point path was allowed, fixed by `DenyAccessPointCreation` (see §4 6.3).
 - (Review) Policy simulator: `DenyOutsideSeoul` blocks a call to another Region and allows Seoul and the listed global
   services; the pipeline cannot change account-level S3 Block Public Access; a Deny-all default version of
-  `pipeline-boundary` blocks a role that carries it (E9 second switch).
-- Record each policy simulator check (principal, action, resource, expected result) so E7 can re-run it (ADR 0003).
-- (Review) Deleting a log object is denied; state reads and writes appear as data events; measure their cost.
-- (Review) The root-activity runbook includes the G2 health check.
+  `pipeline-boundary` blocks a role that carries it (E9 second switch). Done 2026-10-08 (simulator groups A, B, E).
+- Record each policy simulator check (principal, action, resource, expected result) so E7 can re-run it (ADR 0003). Done: `infra/bootstrap/checks/simulate_policies.py`.
+- (Review) Deleting a log object is denied; state reads and writes appear as data events; measure their cost. Done 2026-10-08 (see §4 6.2, 6.6).
+- (Review) The root-activity runbook includes the G2 health check. Done 2026-10-08: `docs/runbooks/root-activity.md` §4.
 
 ## 7. Carry-over to next phase
 - (Phase 1) Add an `ec2:InstanceType` allowlist to P4 when compute arrives (ADR 0004 (f)).
