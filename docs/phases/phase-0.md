@@ -3,9 +3,9 @@
 > Recovery point for this Phase and the source for the STATUS.md report.
 > Update at the end of each learning topic, decision, and implementation step. Keep it short; this is not a transcript.
 
-**Phase status:** In progress
-**Current step:** 5 Verification (started 2026-10-08 after the owner confirmed; Step 4 closed with M0–M6, PR #10–#18)
-**Next action:** Step 5 passed on 2026-10-08 (criterion 1 with the email contact carried over, option C2). Phase 0 stays open: do not close it (Step 6) until the owner says so.
+**Phase status:** Complete (closed 2026-10-09)
+**Current step:** 6 Close (done 2026-10-09; report in `STATUS.md`)
+**Next action:** None. Phase 0 is closed; Phase 1 starts in a new session.
 **Last updated:** 2026-10-08
 
 > **Resume point.** Step 3 closed on 2026-10-04 (ADR 0001–0007). Step 4 closed on 2026-10-08 (M0–M6, PR #10–#18). Step 5 in progress since 2026-10-08; see Next action and §5.
