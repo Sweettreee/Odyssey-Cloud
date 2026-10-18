@@ -3,14 +3,14 @@
 > Updated only when a Phase **starts** (Progress table) and when it **closes** (Progress table + report).
 > Mid-phase progress lives in `docs/phases/phase-N.md`.
 
-**Last updated:** 2026-10-09
+**Last updated:** 2026-10-10
 
 ## Progress
 
 | Phase | Name | Status | Started | Completed | Report |
 |---|---|---|---|---|---|
 | 0 | Foundations & Guardrails | Complete | 2026-09-17 | 2026-10-09 | [Report](#phase-0-foundations--guardrails-2026-09-17--2026-10-09) |
-| 1 | Secure Access & Linux Compute | Not started | — | — | — |
+| 1 | Secure Access & Linux Compute | In progress | 2026-10-09 | — | — |
 | 2 | Personal Web UI & Storage | Not started | — | — | — |
 | 3 | Data Collection & Delivery: Building the Agent's Tools | Not started | — | — | — |
 | 4 | Observability & Recovery Tools | Not started | — | — | — |
