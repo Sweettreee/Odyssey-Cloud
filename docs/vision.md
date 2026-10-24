@@ -4,8 +4,8 @@
 | | |
 |---|---|
 | **Owner** | Noel (김진식) |
-| **Status** | Draft v0.8 (for review) |
-| **Date** | 2026-10-04 |
+| **Status** | Accepted v1.0 |
+| **Date** | 2026-10-24 |
 | **Document type** | Idea & Learning Vision. This is **not** a software design document. |
 
 > This document explains **what** I want to build, **why** I want to build it, and **what kind of engineer** I intend to become by building it. It deliberately leaves implementation choices open. Architecture decisions will be made later, one problem at a time, and each will be recorded as an ADR.
@@ -21,20 +21,18 @@ I am building an **Autonomous Personal Cloud Platform**: my own cloud service.
 **What the platform provides.**
 
 - **Self-service compute.** Linux and Windows environments can be provisioned on demand, the way a public cloud provider offers them. The details depend on the stage (§4.1).
-- **Secure access.** Only I and explicitly authorized people can reach the platform, from anywhere.
+- **Secure access.** Only I can reach the platform, from anywhere. Sharing with people I approve comes only in Stage 2 (§4.1).
 - **A Personal Web UI.** One place for my files and for all the information the platform collects.
 - **An AI agent on Slack with two roles.**
   - **SysAdmin:** operates the infrastructure.
   - **Productivity Assistant:** carries out the tasks I assign and automates recurring work.
 
-**Why I am building it.** In order of importance:
+**Why I am building it.** One goal, reached through one means:
 
-1. **Learning.** Build production-level Cloud Engineer skills.
-2. **Building my own cloud service.** Design and operate a cloud, not just use one.
-3. **Access to other OS platforms.** I occasionally need a different OS.
-4. **Wanting a personal private cloud.** An environment that belongs to me.
+- **Goal:** Become a production-minded Cloud Engineer.
+- **Means:** Build and operate my own private cloud service, designed against real problems and real constraints rather than as a tutorial or a showcase.
 
-Along the way, the platform also solves concrete everyday problems (§2.2).
+The everyday problems in §2.2 are those real problems.
 
 ---
 
@@ -42,22 +40,20 @@ Along the way, the platform also solves concrete everyday problems (§2.2).
 
 ### 2.1 Why I am building this
 
-| # | Motivation | What it means for the project |
+| Role | Item | What it means for the project |
 |---|---|---|
-| 1 | **Learning** | The project is my main vehicle for becoming a Cloud, DevOps, or SRE engineer. Every design decision is also a learning exercise (§7). |
-| 2 | **Building my own cloud service** | I want to design and operate the cloud itself: virtualization, self-service provisioning, networking, identity, and operations. Using someone else's cloud is not the end goal. |
-| 3 | **Occasional need for other OS platforms** | Some tasks need Windows (CLI or full desktop) or an isolated Linux environment. These should be available on demand. |
-| 4 | **Wanting a personal private cloud** | I want a cloud environment that I own and control. |
+| Goal | **Become a production-minded Cloud Engineer** | The project is my main vehicle for becoming a Cloud, DevOps, or SRE engineer. Learning means practicing judgment, not using many technologies: every design decision is also a learning exercise (§7), and the options I do not build are compared and explained in the ADRs. |
+| Means | **Build and operate my own private cloud service** | I design and operate the cloud itself: virtualization, self-service provisioning, networking, identity, and operations, in an environment that I own and control. What gets built is decided by real problems (§2.2) and constraints (§5.1), never by learning value alone. Using someone else's cloud is not the end goal. |
 
 ### 2.2 Everyday problems the platform should also solve
 
 | Problem | Today | Desired state |
 |---|---|---|
-| Academic information is scattered | I check the LMS, department notices, and email separately | One morning briefing tells me today's classes, deadlines, and priorities |
-| Career opportunities are scattered | I browse Wevity, Linkareer, and others by hand | New job, internship, and contest listings arrive weekly, already organized |
-| Deadlines slip | Missed homework and club duties are noticed too late | I get an alert *before* something becomes overdue |
+| Academic information is scattered | I check the LMS, Everytime, department notices, and email separately | One morning briefing tells me today's classes, deadlines, and priorities |
+| Career opportunities are scattered | I browse Linkareer, JobKorea, JobPlanet, Incruit, OKKY, Saramin, Jobda, Wevity, and company career pages by hand | Listings from these sources are in one place, ranked by relevance to Cloud, DevOps, and SRE, and new ones are announced in Slack. For each collected source I can trust that a listing missing here is not on that source; sources that cannot be collected completely are kept as links |
+| Deadlines slip | I postpone assignments and club tasks ("I'll look later") and then forget them. Personal and club schedules agreed in chats are recorded nowhere | I add a schedule with one short line in Slack, and I get short, readable reminders before each deadline, so a postponed task comes back before it is too late |
 | Repetitive work takes my time | I do recurring tasks by hand | I assign tasks to an AI assistant and receive the results |
-| Files live on too many devices | Finding a file means guessing where it is | I can upload, download, and search in one place, including with natural language |
+| Files live on too many devices | Finding a file means guessing where it is | My files stay in sync on every device and host I use, without manual copying, and I can search them in one place, including with natural language |
 | I occasionally need another machine | I have no remote Linux or Windows environment | I can start one from Slack when needed, and it stops itself when I am done |
 
 ---
@@ -75,7 +71,7 @@ At every stage, the platform must meet these conditions:
 - An AI agent can inspect and operate it safely under human control.
 
 ### 3.2 Career goal
-Be ready for Cloud, DevOps, and SRE roles. The evidence should be a live system with documented trade-offs, measured outcomes, and public write-ups, rather than a list of technologies I have "used".
+Be ready for Cloud, DevOps, and SRE roles. The evidence is the live system itself: the README introduces what I built, and the ADRs show how and why I decided, rather than a list of technologies I have "used".
 
 ---
 
@@ -87,14 +83,23 @@ This table is also the **requirements checklist** used in §9.
 
 | Area | Capability |
 |---|---|
-| **Cloud foundation** | Compute is provisioned on demand through self-service, as with a public cloud provider. **Stage 1:** a public cloud provides the physical hosts and hypervisor, and my platform provisions compute as code through the CI/CD pipeline, after my approval. **Stage 2:** my own private cloud on my own hardware; to be designed later (§6, Stage 2). |
-| **Secure access** | Reachable from anywhere. Access is limited to me and allowlisted people through a VPN or zero-trust layer, with a private network and least-privilege identities. |
+| **Cloud foundation** | Compute is provisioned on demand through self-service, as with a public cloud provider. **Stage 1:** a public cloud provides the physical hosts and hypervisor, and my platform provisions compute as code through the CI/CD pipeline, after my approval. I am the only user, so I expect little reason to change host or resource size dynamically; containers and Windows sessions still start and stop on demand. Nothing is shared with other people. **Stage 2:** my own private cloud on my own hardware. Its main goal is to provision my own compute resources and share them with other people, each share approved by me; to be designed later (§6, Stage 2). |
+| **Secure access** | Reachable from anywhere. Access is limited to me through a VPN or zero-trust layer, with a private network and least-privilege identities. **Stage 2:** people I approve one by one can reach only what I share with them. |
 | **Linux compute** | Lightweight containers are provisioned on demand. **Stage 1:** they run on Linux instances. **Stage 2:** to be designed later. |
 | **Windows compute** | Windows is provisioned **on demand only**, in two modes: CLI/script execution and a full GUI desktop over RDP or VNC. **Stage 1:** separate on-demand instances from the provider. **Stage 2:** to be designed later. |
-| **Personal Web UI** | Upload and download files, and browse all collected information: schedules, notices, job and contest listings, and briefing history. The AI agent can read, analyze, and search the files. **Beautiful UI/UX is a requirement.** The specific design is decided when the Web UI is built. |
+| **Personal Web UI** | The place where I look at results; what it must show is listed below the table. It never changes infrastructure and is not an operations console; commands go through Slack. As a starting point, the only thing I change on it is my own files (upload, download, and delete); the exact set of writes is decided in the phase that builds each view. The AI agent can read, analyze, and search the files. **Beautiful UI/UX is a requirement.** Screens, layout, and design are decided in the phase that builds each view. |
 | **AI SysAdmin** | It can query resources and monitor the platform, and it runs first-level recovery. Every infrastructure change it proposes, such as creating or starting a resource or allocating CPU, RAM, and storage, is written as code and reaches the cloud only through the pipeline after **Review & Confirm**. |
-| **AI Productivity Assistant** | It **carries out tasks I assign and automates recurring work**. The first capabilities are examples, not the full scope: collecting LMS schedules, notices, class materials, and career listings; morning briefings; deadline alerts; and natural-language search (RAG) over files and collected data. Any task with an external effect (sending, submitting, booking, and similar) requires **Review & Confirm**. |
+| **AI Productivity Assistant** | It **carries out tasks I assign and automates recurring work**. The first capabilities are examples, not the full scope: collecting LMS schedules, notices, class materials, and career listings; morning briefings; deadline alerts; and natural-language search (RAG) over files and collected data. Any task with an external effect (sending, submitting, booking, and similar) requires **Review & Confirm**. Its capabilities grow over time by adding tools as needed, through one standard tool interface (for example, MCP servers). Each new tool is a part like any other: it follows the order in §5.2 and gets only the permissions it needs. |
+| **Devices** | Mainly a laptop and an iPad. Everything I use day to day (the Web UI, my files, Slack, and the secure access path to them) also works on my phone. |
 | **Interface** | Slack is the interface for all commands, alerts, and briefings. |
+
+**What the Personal Web UI must show.** Screens and layout are decided in the phase that builds each view.
+
+- **Time view, seen first:** classes, assignments, exams, my own schedules, and deadlines on one time axis: this week, then this month, then the whole semester.
+- **Career listings:** job, internship, and contest listings with filtering, search, and priority by relevance to Cloud, DevOps, and SRE, plus links to the sources that are not collected. Later: my application history (when I applied, the replies, and the schedules that follow), shown in the time view.
+- **Automation status:** each automated job, its run history, and the last successful collection per source, with whether each one ran correctly shown first.
+- **Notices, class materials, and briefing history.**
+- **My files.**
 
 ### 4.2 Problem-first framing
 
@@ -121,7 +126,7 @@ Each capability starts from a question, not from a service name.
 | **Windows** | Windows runs on demand only and never stays on. Auto-shutdown is mandatory. |
 | **Human-in-the-loop** | The AI may query resources and propose infrastructure changes as code. Two kinds of action always require explicit confirmation: every infrastructure change, including create, start, modify, stop, and delete, which reaches the cloud only through the pipeline after my approval; and delegated tasks with external effects. This must be enforced by permissions, not just by the prompt. How automatic actions, such as first-level recovery and Windows auto-stop, fit this rule is decided in the phase that builds them. |
 | **Infrastructure as Code** | There is no ClickOps. Every resource and every service is deployed through code and CI/CD pipelines, except for exceptions recorded in an ADR. |
-| **Access** | Only I and explicitly authorized people can reach the platform. |
+| **Access** | In Stage 1, only I can reach the platform. In Stage 2, people I approve one by one can reach only what I share with them (§4.1). |
 
 **AWS budget allocation.** The AWS target is split by capability, so early phases leave room for later ones. Each phase confirms or adjusts its line at Step 1. The lines add up to the target.
 
@@ -137,9 +142,22 @@ Each capability starts from a question, not from a service name.
 
 ### 5.2 Design principles
 
-- **The private cloud is the destination.** The public-cloud stage is interim. Stage 1 choices should not block a later move to my own hardware.
+When these principles pull against each other, this order decides:
+
+1. **Hard constraints** (§5.1), the blank-page gate, and the Stage 2 block test (below). An option that fails any of them is not a candidate.
+2. **Self-run by default** (below).
+3. **Fewest moving parts**, then **least ongoing operation** (below).
+
+Learning value and résumé value never justify adding a part or choosing a more complex option (§2.1).
+
+- **The private cloud is the destination; I run its parts myself by default.** The public-cloud stage is interim. Stage 1 choices must not block a later move to my own hardware. An option blocks it if leaving it would force a redesign of other parts, or if its data could not be taken out. Every part is one of these:
+  - **Self-run:** existing software that I install, configure, update, and operate on compute I control, depending on nothing the provider runs except primitives. Self-run does not mean writing the software myself.
+  - **Primitive:** a basic resource that any infrastructure, my own hardware included, provides: compute, networks and firewall rules, disks and object storage, identities and permissions, audit logs, and commodity internet services such as domain names. Controls that exist only to watch or bill the provider account, hold no platform data, and disappear with the account also count.
+  - **Managed service:** any part whose software or control plane someone else runs: a higher-level provider service, a third party's hosted control plane (even when its agent runs on my host), or a hosted product.
+  - A managed service replaces a self-run part only through an ADR that shows one of these: every self-run and primitive option fails step 1; self-run is clearly worse on security or availability; or running it myself takes more operation or development work than I accept. The last is my call, made at design time or later when the burden shows up. The ADR records the burden and what leaving the managed service would cost.
+  - The default decides how a needed part is provided, never whether a part is needed (§2.1). Services this document already sets, such as the chat interface and the AI API, are outside it.
 - **Infrastructure and data collection come first; AI comes in stages.** Deterministic collection, briefings, and alerts come first. The AI is added in layers: read-only first, then actions and delegated tasks under confirmation. Rule-based components are not throwaway work: they become the agent's tools and remain as fallbacks.
-- **Keep it simple.** Pick the simplest design that meets the constraints. Avoid resume-driven development.
+- **Keep it simple.** Among the candidates the order above leaves, pick the simplest. Avoid resume-driven development.
   - **Gate:** I can explain every part of the design, and why it exists, on a blank page (§7.1). A design that fails this is not a candidate.
   - **Then compare, in order:**
     1. **Fewest moving parts:** fewer components, services, and connections that I must run.
@@ -148,7 +166,8 @@ Each capability starts from a question, not from a service name.
 - **Keep the platform extensible.** New services should plug in without re-architecting.
 - **Log for security across the whole platform.** Keep access and action logs for everything, not only the AI: sign-ins, file access, resource changes, and agent actions. Logs must be reviewable.
 - **Beautiful UI/UX is a requirement.** It is not an afterthought.
-- **Treat collected content as untrusted.** Web pages and notices that the AI reads may contain text that tries to steer it. That content must never be able to trigger infrastructure actions or delegated tasks.
+- **Treat collected content as untrusted.** Web pages, notices, and tool results that the AI reads may contain text that tries to steer it. That content must never be able to trigger infrastructure actions or delegated tasks.
+- **Limit what leaves the platform.** Personal data sent to an outside service, such as the AI API, is limited to what each task needs.
 
 ### 5.3 Working principles
 
@@ -156,14 +175,14 @@ Each capability starts from a question, not from a service name.
 - **Explain like I'm 12 first, then technically.** Every explanation starts with the simplest version, then gives the short technical version.
 - Before any implementation, write down what I am doing, why, which alternatives I considered, and the trade-offs. Implement only once I fully understand the plan.
 - Record every significant decision as an **ADR**.
-- AI-generated code is reviewed and applied by me, never pasted in blindly.
+- AI-generated code is reviewed and applied by me, never pasted in blindly. One exception: the Web UI's look and feel (layout, styling, and visual components) may be designed and built with AI, and I judge it by the result. Web UI code at a trust boundary (sign-in, sessions, file handling, and data access) is reviewed like any other code.
 - Documentation, code, and UI labels are all written in English.
 
 ### 5.4 Known cost traps to evaluate early
 
 These do not rule anything out; I need to check them before designing.
 
-- **Hourly base charges.** Some managed building blocks have base charges that can exceed the whole monthly budget by themselves. Examples include always-on NAT gateways, managed client VPN endpoints, and load balancers.
+- **Hourly base charges.** Some managed services have base charges that can exceed the whole monthly budget by themselves. Examples include always-on NAT gateways, managed client VPN endpoints, and load balancers.
 - **Public IPv4 addresses** are billed as well.
 - **Windows** requires x86 hardware and costs more per hour than Linux.
 - **LLM API usage** grows with every briefing, query, and delegated task.
@@ -179,7 +198,7 @@ The roadmap has two stages.
 - **Stage 1** builds the platform on a public cloud as an interim foundation.
 - **Stage 2** moves it onto my own hardware as a private cloud. Its design has not started.
 
-The phases are ordered by dependency and risk, not by fixed dates. Each phase has a problem, a scope, a learning focus, exit criteria, and a **Phase Learning Brief**.
+The phases run in order, one at a time. They are ordered by dependency and risk, not by fixed dates. Each phase has a problem, a scope, a learning focus, exit criteria, and a **Phase Learning Brief**.
 
 **Phase Learning Brief.** Instead of explaining every concept as it comes up, each phase has two lists:
 
@@ -243,12 +262,15 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 #### Phase 2: Personal Web UI & Storage
 - **Problem:** My files are spread across devices.
 - **Scope:**
-  - Durable storage, an authenticated Web UI for upload and download, encryption at rest, and lifecycle rules. Views for collected data are added in Phase 3.
+  - Durable storage, file sync across my devices and hosts (the method is decided in this phase), an authenticated Web UI for upload and download, encryption at rest, and lifecycle rules. Views for collected data are added in Phase 3.
   - **Application CI/CD** starts here, with the Web UI as the first service: build, test, package, deploy, and roll back. Every later service reuses it.
 - **Learning focus:** Data, Security, Cost, and delivery automation.
 - **Exit criteria:**
   - I can upload from my phone off-campus.
-  - The UI meets the UI/UX bar.
+  - A file I add or change on one device appears on my other devices and hosts within the target set at Step 1.
+  - A deleted or overwritten file can be restored.
+  - A lost device can be cut off from my files without affecting the others.
+  - I judge the UI beautiful and easy to use on my laptop, iPad, and phone.
   - File access is logged.
   - A Web UI change can be deployed and rolled back through the pipeline.
   - Storage cost stays bounded by policy.
@@ -260,16 +282,16 @@ The lists stay at topic level and do not name specific tools, so they do not loc
     - Authentication vs. authorization, and sessions vs. tokens.
     - Security risks of file uploads.
     - Image builds, automated tests, deployment strategies, and rollback.
-    - Basic UI/UX principles.
   - *Before moving on, I can explain:*
-    - How a file is uploaded, stored, and downloaded, and the security control at each step.
+    - How a file is synced, uploaded, stored, and downloaded, and the security control at each step.
     - What drives storage cost and how it is controlled.
     - How a code change gets deployed, and how it is rolled back.
 
 #### Phase 3: Data Collection & Delivery: Building the Agent's Tools
 - **Problem:** Academic and career information is scattered, and deadlines slip.
 - **Scope:**
-  - Scheduled collectors for the LMS, notices, class materials, and career sites.
+  - Scheduled collectors for the LMS, the class timetable (Everytime), notices, class materials, my email (Gmail: applications and subscriptions), and career sites (§2.2). A career source is collected only when it can be collected completely and its terms allow it; the others are kept as links. I can add a company career page as a new source.
+  - Adding a schedule with one short line in Slack.
   - A normalized store for the collected data.
   - A **template-based** morning briefing and deadline alerts in Slack.
   - Web UI views for the collected information.
@@ -279,6 +301,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 - **Exit criteria:**
   - Briefings arrive every weekday for several consecutive weeks without manual fixes.
   - A broken collector raises an alert before I notice missing data.
+  - A spot check of each collected source finds no listing missing since its last successful collection, and that time is visible for every source.
   - All collected information can be browsed in the Web UI.
 - **Learning Brief (guideline):**
   - *Before starting:*
@@ -426,20 +449,19 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 | Automation & data pipelines | Collectors, briefings, and delegated tasks | Collector success rates, automated task history, and a log of how failures were handled |
 | Safe AI operations | Phases 5 and 6 | Permission model, confirmation flow, and audit log |
 | Private cloud | Phase 8 (details decided in Stage 2) | To be defined in Stage 2 |
-| Frontend & UX | Personal Web UI | UI screenshots and design rationale |
+
+**Priority.** Every competency above is an important learning target except Automation & data pipelines. That one is lower for learning: its features may matter in daily use, but studying it in depth is not a goal.
 
 ---
 
 ## 8. Outcomes & Portfolio
 
 ### 8.1 Artifacts
-- A public repository (secrets and personal data excluded) containing IaC, the pipelines, and a clear README.
+- A public repository (secrets and personal data excluded) containing IaC, the pipelines, and a README that introduces what I built.
 - An ADR log and architecture diagrams for each phase.
-- Blog posts on LinkedIn or Medium covering the *why* behind key decisions, the alternatives, and the limits I hit.
-- Short Loom-style videos explaining the design intent, which double as interview practice.
+- One introduction video for my portfolio, made when the project is done.
 
 ### 8.2 Metrics to track from day one
-Without measurements, there are no XYZ bullets later.
 
 - Monthly cost for AWS and for the AI API, each compared with its own budget.
 - Time to rebuild the environment from zero.
@@ -449,14 +471,6 @@ Without measurements, there are no XYZ bullets later.
 - Collector success rate and briefing delivery rate.
 - Agent actions and delegated tasks: count, confirmations requested, and actions blocked.
 - Coverage of security logging across components.
-
-### 8.3 XYZ bullet templates
-The numbers will be filled in from real data only.
-
-- *Designed a zero-trust personal cloud with Terraform and CI/CD, reducing full-environment rebuild time from [X] to [Y] while keeping 100% of resources under code.*
-- *Implemented on-demand Windows and Linux compute with enforced auto-stop, keeping monthly AWS cost at [X] USD against a USD 20 target.*
-- *Built monitoring and scripted self-healing that detected [X]% of injected failures, with a mean recovery time of [Y] minutes.*
-- *Introduced a Slack-based AI operator and assistant with permission-level human-in-the-loop controls, completing [X] delegated tasks with zero unconfirmed external or destructive actions.*
 
 ---
 
@@ -472,7 +486,7 @@ The numbers will be filled in from real data only.
 
 ## 10. Non-Goals
 
-- Multi-tenant or commercial SaaS.
+- A commercial or public multi-tenant service. In Stage 2, sharing my compute with people I approve one by one (§4.1) is not excluded.
 - Multi-region high availability.
 - Technologies adopted mainly to decorate a résumé.
 - Training or hosting my own LLM.
@@ -487,6 +501,7 @@ The numbers will be filled in from real data only.
 | AI misuse or prompt injection through collected content | Read-only first, a permission-level confirmation gate, and treating collected data as untrusted |
 | Delegated tasks acting wrongly in external services | Narrowly scoped credentials, confirmation for external effects, and an audit trail |
 | Collectors breaking when sites change | Failure alerts, and a preference for official APIs, subscriptions, or feeds over scraping |
+| Sync spreads a deletion or damage to every copy | Earlier versions are kept so a file can be restored (Phase 2) |
 | Scope creep and burnout | Strict phase exit criteria, with one phase active at a time |
 | Falling back into the tutorial trap | The blank-page explanation is required before every build |
 
@@ -494,7 +509,16 @@ The numbers will be filled in from real data only.
 
 ## 12. Open Questions (next review)
 
-1. **Authorized personnel (answered 2026-10-04):** The platform is for me. I may lend selected features to people I authorize, each with their own account. Which features, and for how many people, is decided when those features are designed.
-2. **LMS access:** How will the collectors authenticate to the university LMS? Do the LMS terms of use allow automated access?
+1. **Authorized personnel (answered 2026-10-04, changed 2026-10-24):** In Stage 1 the platform is only for me; nothing is shared or lent to other people. In Stage 2, sharing my compute with people I approve one by one is a goal (§4.1).
+2. **LMS, Everytime, and email access:** How will the collectors authenticate to each? Do their terms of use allow automated access?
 3. **Interim cloud provider and region (answered by ADR 0001):** AWS in the Seoul region (`ap-northeast-2`).
-4. **Timeline:** Which phase should be finished by when? For example, what should be done before the next internship application cycle or the next semester?
+
+---
+
+## 13. Change log
+
+| Version | Date | Summary |
+|---|---|---|
+| 1.0 | 2026-10-24 | One goal (become a production-minded Cloud Engineer) and one means (my own private cloud service). Self-run by default, with a written order of precedence. Nothing is shared in Stage 1. The Web is for results, with a list of what it must show. Added devices, file sync, career sources and trust, schedules, tools for the AI, and an AI-built UI look and feel. Set the learning priority. The portfolio is now the README, the ADRs, and one video. Removed the timeline. |
+
+Earlier versions are in the git history.

@@ -9,7 +9,7 @@ A long-term personal cloud platform. It provides secure access, on-demand Linux 
 - **Stage 1** runs on a public cloud as an interim foundation.
 - **Stage 2** (my own hardware and private cloud) is **undecided**. Do not design for any specific Stage 2 technology.
 
-The project has two equal goals: building the platform, and learning to become a production-minded Cloud Engineer.
+The project has one goal and one means. The goal is to become a production-minded Cloud Engineer; the means is building and operating my own private cloud service. Learning comes from making and explaining decisions, never from adding a technology for its learning value alone (`docs/vision.md` §2.1).
 
 **Source of truth:** `docs/vision.md`.
 - Never edit it without my explicit approval.
@@ -20,7 +20,7 @@ The project has two equal goals: building the platform, and learning to become a
 You are a **mentor and pair engineer**, not an autonomous builder.
 
 - **Assume I have no prior knowledge.**
-- **Do not design the system for me.** Present the problem, the options, and the trade-offs. I decide.
+- **Do not design the system for me.** Present the problem, the options, and the trade-offs. I decide. Exception: the Web UI's look and feel may be designed and built with AI (`docs/vision.md` §5.3); code at a trust boundary follows the normal rules.
 - **Do not write or change files before explaining what, why, and which alternatives exist, and getting my approval.** Keep each change small so I can review it.
 
 ## 3. Language and explanation style
@@ -107,7 +107,7 @@ Every Phase follows these steps **in order**.
 |---|---|
 | **1. Learning Brief review** | The Brief in `docs/vision.md` is only a guideline. Propose additions and removals for this Phase. After I agree, record the final list in the phase note. Also propose this Phase's availability and latency targets and confirm its line in the AWS budget allocation (`docs/vision.md` §5.1); after I agree, record them in the phase note. |
 | **2. Learning** | Teach one "Before starting" topic at a time, following §3. After each topic, write 1–3 lines of key takeaways in the phase note and check the topic off once I confirm I understand it. |
-| **3. Design & decisions** | For each design question, present the problem and constraints, 2–3 options, and a 6-Layer check (Traffic, Compute, Data, Security, Cost, Observability). I decide. Write an ADR from `docs/templates/adr.md` and link it in the phase note. |
+| **3. Design & decisions** | For each design question, present the problem and constraints, 2–3 options, and a 6-Layer check (Traffic, Compute, Data, Security, Cost, Observability). Include a self-run or primitive option whenever one exists, and state each option's class (self-run, primitive, managed) and Stage 2 exit cost. I decide. Write an ADR from `docs/templates/adr.md` and link it in the phase note. |
 | **4. Implementation** | Break the work into small steps. For each step: explain what, why, and the alternatives; wait for approval; make the change; show me what changed. Log each step in the phase note. |
 | **5. Verification** | Check every exit criterion and record the evidence. For every "Before moving on" item, **I explain it**; you check my explanation and fill the gaps. |
 | **6. Close** | Follow §5.3. |
@@ -170,12 +170,12 @@ These rules always apply, even if I ask casually.
 
 ## 11. Design principles (summary of `docs/vision.md` §5)
 
-- **Simplicity:** choose the simplest design that meets the constraints. No resume-driven development.
-  - Gate: every part can be explained on a blank page. Then compare in order: fewest moving parts, then least ongoing operation.
+- **Order of precedence:** hard constraints, the blank-page gate, and the Stage 2 block test; then self-run by default; then fewest moving parts, then least ongoing operation. Learning or résumé value never justifies adding a part or a more complex option. No resume-driven development.
+- **Self-run by default:** a part is self-run (existing software I operate on compute I control, not software I write) or a provider primitive. A managed service needs an ADR showing that self-run fails a hard constraint, is clearly worse on security or availability, or takes more operation or development work than I accept (my call, at design time or later). The ADR records that burden and the Stage 2 exit cost. The default decides how a needed part is provided, never whether it is needed.
   - Cost is a hard constraint, not a simplicity criterion.
 - **Infrastructure as Code:** all infrastructure is code, deployed through CI/CD. Console use is read-only, except for exceptions recorded in an ADR.
 - **Human-in-the-loop:** every infrastructure change, including create, start, and stop, goes through code and the pipeline after my approval; delegated tasks with external effects require confirmation. Both are enforced by permissions, not by prompts.
 - **Staged rollout:** rule-based components come first. They later become the agent's tools and stay as fallbacks.
 - **Security logging:** access and actions are logged across the whole platform.
-- **UI/UX:** a beautiful UI/UX is a requirement.
-- **Stage 2:** Stage 1 choices must not block a later move to my own hardware. Stage 2 itself stays undecided.
+- **UI/UX:** a beautiful UI/UX is a requirement, judged by me. It is not a learning goal; its look and feel may be built with AI (`docs/vision.md` §5.3).
+- **Stage 2:** Stage 1 choices must not block a later move to my own hardware (leaving a part must not force a redesign of other parts, and its data must be extractable). Stage 2 itself stays undecided.
