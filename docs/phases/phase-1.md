@@ -5,8 +5,8 @@
 
 **Phase status:** In progress
 **Current step:** 3 Design & decisions (since 2026-10-18)
-**Next action:** Design question 1 (access layer). The question list and unverified facts are in §6.
-**Last updated:** 2026-10-18
+**Next action:** Design question 2 (network). ADR 0008 covers question 1. The question list and unverified facts are in §6.
+**Last updated:** 2026-10-25
 
 ## Carry-over from previous phase
 - Add an `ec2:InstanceType` allowlist to P4 when compute arrives (ADR 0004 (f)).
@@ -33,7 +33,7 @@ Status: Final (agreed on 2026-10-10). Narrowed 4, widened 5 and 7, added topics 
 
 ### Before moving on (I can explain…)
 - [ ] The path a request takes from my device to a container.
-- [ ] Why I can connect even though no ports are open to the public.
+- [ ] Why only the Web entry is reachable from the internet, and what an outsider sees there.
 - [ ] The access approach I chose, the alternatives I rejected, and their cost difference.
 - [ ] How a container is created and destroyed through code, and who approves each step.
 - [ ] Where an access attempt is recorded, and how I review it.
@@ -105,7 +105,7 @@ Status: Final (agreed on 2026-10-10). Narrowed 4, widened 5 and 7, added topics 
 
 | ADR | Title | Status |
 |---|---|---|
-| — | — | — |
+| [0008](../adr/0008-access-layer.md) | Access layer: Web entry, Web login, and admin path | Accepted |
 
 ## 4. Implementation log
 
@@ -122,13 +122,20 @@ Status: Final (agreed on 2026-10-10). Narrowed 4, widened 5 and 7, added topics 
 
 ## 6. Open issues
 - Step 3 design questions (suggested order; the owner may reorder):
-  1. Access layer: Session Manager, EICE, Tailscale, Cloudflare, or a self-hosted VPN (including SSH host keys on rebuild).
+  1. Access layer, split by use (owner, 2026-10-24): the Web (my services and my own files, CRUD) works in a browser on any device over the internet with a simple login, with no VPN client and no `aws login`; developing and managing services is never possible through the Web and happens in practice from the MacBook with the existing `aws login` (not enforced per device). Factors: 1-1 Web entry, 1-2 Web login (including lost-device cut-off), 1-3 MacBook admin path (including SSH host keys on rebuild).
+     - 1-1 decided (2026-10-25): CloudFront in front of Caddy on the host (managed front, self-run origin), in two stages. Now: pay-as-you-go CloudFront within the always-free allowance (1 TB and 10 million requests a month) on the Free account plan, with Shield Standard only and no AWS WAF. At the upgrade to the Paid plan (due within the Free plan's six months): subscribe the same distribution to the Free flat-rate plan (no overage charges; blocked attacks do not count). Reason: no self-run option keeps the cost of a many-IP flood within the budget hard constraint (`docs/vision.md` §5.1); an automatic stop breaks the human-in-the-loop rule and a manual stop depends on my reaction time. CloudFront terminates the viewer TLS (AWS sees the traffic; no new third party). The origin keeps a public IPv4, and its security group admits only the CloudFront managed prefix list. Accepted risks: until the switch, a flood beyond the always-free allowance uses credits (counted as cost), and using them up closes the account; after it, there is no advanced DDoS protection, so a large flood can slow or stop the site but cannot raise the bill. Rejected: Caddy alone with an automatic or a manual stop; Cloudflare Tunnel (a third party carries the traffic); ALB (about USD 16.4 a month in us-east-1 alone); AWS WAF before the switch (at least about USD 6 a month plus per-request charges). Follow-ups: CloudFront-to-origin protocol and certificate; `Authorization` header forwarding; a domain and its price; an early alarm on CloudFront request volume (question 6); whether the plan subscription can be code; geographic blocking after the switch.
+     - 1-2 decided (2026-10-25): a, Caddy `basic_auth` (self-run; one long random password from a password manager, stored as a bcrypt hash). Brute-force blocking: none until the flat-rate switch (fail2ban behind CloudFront sees only CloudFront addresses), then the plan's IP-based rate limiting. Chosen over b (Authelia with a passkey) as simpler. Accepted risks: anyone past the login can read and change everything the Web shows, though the Web cannot change infrastructure (`docs/vision.md` §4.1); cutting off one lost device means changing the password for every device (recheck against the Phase 2 lost-device criterion). Rejected: b (one more service; no per-device session revoke upstream); c (mTLS; Safari support known only from Apple forum answers; a private CA to run). Follow-ups: where the bcrypt hash is kept outside git (question 4); the rate-limit threshold; whether Caddy logs carry the status code and the viewer IP behind CloudFront. ADR 0008 is written after 1-3.
+     - 1-3 decided (2026-10-25): a, Session Manager (managed, AWS) from the MacBook with the existing `aws login`. Chosen as the simplest: SSM Agent is preinstalled on AL2023, there are no SSH keys, and no host key to re-trust after a rebuild. No new internet entry: the agent connects out. Systems Manager is "Available on both plans" on the AWS Free Tier page (checked 2026-10-25). Records: CloudTrail `StartSession`; shell session content can also be logged. Needs: SSM permissions for the host (instance profile with `AmazonSSMManagedInstanceCore`, or DHMC) and an outbound path to Systems Manager (the host's public IPv4). Self-run is clearly worse on security here: the only self-run option, c (WireGuard for the MacBook), opens a second internet entry against "only the Web entry is reachable". Rejected: b (EICE; an endpoint, two security group rules, SSH keys, and a new host key on every rebuild, though the host would need no AWS permissions); d (no shell). Stage 2 exit: only the admin path is replaced (inference). Accepted risk: the host role gains SSM permissions; IMDS hop limit 1 keeps containers away from them (question 4). Follow-ups: where shell session logs go and their cost (question 6); whether the shell is for looking only, not changing (strict IaC).
   2. Network: public IPv4 or IPv6 only, the outbound path, and the default VPC (carry-over).
   3. Compute: OS, instance size, CPU credit mode, root disk size, and the P4 `ec2:InstanceType` allowlist (carry-over).
   4. Host upkeep and permissions: patch in place or replace (and whether scheduled patching is a change under strict IaC), DHMC or instance profile, IMDS hop limit, and `iam:PassRole` scope.
   5. Containers: how they are declared and applied, registry, arm64 image by digest, non-root, and the approval path (carry-over).
   6. Logging: Flow Logs, shipping host logs off the host, retention, and alerts on `StartSession`/`OpenTunnel` (ADR 0007 G1–G5 do not cover them).
   7. AWS User Notifications email contact (carry-over).
+- Vision v1.0 (2026-10-24) inputs for Step 3:
+  - Self-run is the default candidate for the access layer, the registry, and log shipping; each ADR states every option's class (self-run, primitive, managed) and its Stage 2 exit cost (`docs/vision.md` §5.2).
+  - Cloud hosts are file sync endpoints (`docs/vision.md` §2.2): root disk size belongs in question 3, and how a rebuilt host gets its synced files back in question 4.
+  - One user only (`docs/vision.md` §5.1 Access); the Web must work in a browser on a laptop, an iPad, and a phone (§4.1 Devices).
 - Not yet verified (check before deciding):
   - Which needed services are reachable over IPv6 only.
   - Whether current AL2023 AMIs set `ImdsSupport` to `v2.0`.

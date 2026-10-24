@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Owner** | Noel (김진식) |
-| **Status** | Accepted v1.0 |
+| **Status** | Accepted v1.1 |
 | **Date** | 2026-10-24 |
 | **Document type** | Idea & Learning Vision. This is **not** a software design document. |
 
@@ -106,7 +106,7 @@ This table is also the **requirements checklist** used in §9.
 Each capability starts from a question, not from a service name.
 
 - How can I eventually run **a cloud of my own**, and how do I keep today's public-cloud work from blocking that move?
-- How can I reach my environment from anywhere **without exposing anything** to the public internet?
+- How can I reach my environment from anywhere **without exposing anything unintended** to the public internet?
 - How can I use a Windows desktop occasionally **without paying for it while it sits idle**?
 - How can an AI operate my infrastructure **without ever being able** to destroy something I did not approve?
 - How can I **hand off recurring work** to an AI and only receive the results, while it still cannot take external actions without my approval?
@@ -256,7 +256,7 @@ The lists stay at topic level and do not name specific tools, so they do not loc
     - VMs vs. containers, and images and registries.
   - *Before moving on, I can explain:*
     - The path a request takes from my device to a container.
-    - Why I can connect even though no ports are open to the public.
+    - Why only the Web entry is reachable from the internet, and what an outsider sees there.
     - The access approach I chose, the alternatives I rejected, and their cost difference.
 
 #### Phase 2: Personal Web UI & Storage
@@ -520,5 +520,6 @@ The lists stay at topic level and do not name specific tools, so they do not loc
 | Version | Date | Summary |
 |---|---|---|
 | 1.0 | 2026-10-24 | One goal (become a production-minded Cloud Engineer) and one means (my own private cloud service). Self-run by default, with a written order of precedence. Nothing is shared in Stage 1. The Web is for results, with a list of what it must show. Added devices, file sync, career sources and trust, schedules, tools for the AI, and an AI-built UI look and feel. Set the learning priority. The portfolio is now the README, the ADRs, and one video. Removed the timeline. |
+| 1.1 | 2026-10-24 | Phase 1 chose one public Web entry, so the §4.2 access question and the Phase 1 "before moving on" item now allow one intended entry instead of no exposure at all. |
 
 Earlier versions are in the git history.

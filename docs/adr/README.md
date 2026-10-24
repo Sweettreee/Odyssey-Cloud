@@ -13,3 +13,4 @@ after that it is never rewritten, and a changed decision gets a new ADR that sup
 | 0005 | [Account identity structure](0005-account-identity-structure.md) | 0 | Accepted | 2026-09-28 |
 | 0006 | [AWS budget alerts and alert delivery path](0006-budget-alerts-and-delivery-path.md) | 0 | Accepted | 2026-09-30 |
 | 0007 | [Security logging baseline and protection of the logging and alert path](0007-security-logging-baseline.md) | 0 | Accepted | 2026-10-02 |
+| 0008 | [Access layer: Web entry, Web login, and admin path](0008-access-layer.md) | 1 | Accepted | 2026-10-25 |
